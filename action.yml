@@ -33,6 +33,7 @@ runs:
     - name: Create screenshots directory
       run: mkdir -p screenshots
       shell: bash
+      working-directory: ${{ github.action_path }}
 
     - name: Run EnsureUI tests
       id: run-tests
@@ -40,6 +41,7 @@ runs:
       shell: bash
       working-directory: ${{ github.action_path }}
       env:
+        PROJECT_ROOT: ${{ github.workspace }}
         DEPLOYMENT_URL: ${{ inputs.deployment-url }}
         TIMEOUT: ${{ inputs.timeout }}
         GITHUB_TOKEN: ${{ inputs.github-token }}

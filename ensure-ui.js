@@ -4,6 +4,7 @@ const { chromium } = require('playwright');
 
 class EnsureUITester {
   constructor() {
+    this.projectRoot = process.env.PROJECT_ROOT;
     this.deploymentUrl = process.env.DEPLOYMENT_URL;
     this.timeout = parseInt(process.env.TIMEOUT) * 1000 || 15000;
     this.githubToken = process.env.GITHUB_TOKEN;
@@ -25,17 +26,19 @@ class EnsureUITester {
   findEnsureUIPages() {
     const pages = [];
     const searchDirs = ['pages', 'app', 'src/pages', 'src/app'];
+    const root = this.projectRoot || process.cwd();
 
     for (const dir of searchDirs) {
-      if (fs.existsSync(dir)) {
-        console.log(`Scanning directory: ${dir}`);
-        const items = fs.readdirSync(dir);
-        console.log(`Contents of ${dir}:`, items);
-        this.scanDirectory(dir, pages);
+      const fullDir = path.join(root, dir);
+      if (fs.existsSync(fullDir)) {
+        console.log(`Scanning directory: ${fullDir}`);
+        const items = fs.readdirSync(fullDir);
+        console.log(`Contents of ${fullDir}:`, items);
+        this.scanDirectory(fullDir, pages);
       }
     }
-    console.log('Current working directory:', process.cwd());
-    console.log('Directory contents:', fs.readdirSync(process.cwd()));
+    console.log('Project root:', root);
+    console.log('Root directory contents:', fs.readdirSync(root));
     return pages;
   }
 
