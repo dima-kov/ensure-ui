@@ -1,0 +1,44 @@
+name: EnsureUI Testing
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      deployment-url:
+        description: 'Deployment URL to test'
+        required: true
+        type: string
+
+jobs:
+  ensure-ui-test:
+    runs-on: ubuntu-latest
+    # Only run on successful deployments or manual triggers
+    if: github.event_name == 'workflow_dispatch' || github.event.deployment_status.state == 'success'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine deployment URL
+        id: deployment-url
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "url=${{ github.event.inputs.deployment-url }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=${{ github.event.deployment_status.target_url }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run EnsureUI Tests
+        id: ensure-ui
+        uses: ./.github/actions/ensure-ui
+        with:
+          deployment-url: ${{ steps.deployment-url.outputs.url }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ensure-ui-screenshots
+          path: screenshots/
+          retention-days: 7

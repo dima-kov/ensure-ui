@@ -1,0 +1,49 @@
+# .github/actions/ensure-ui/action.yml
+name: 'EnsureUI Testing Action'
+description: 'Automated UI testing for pages marked with // ensureUI comment'
+inputs:
+  deployment-url:
+    description: 'URL of the deployed application'
+    required: true
+  github-token:
+    description: 'GitHub token for PR comments'
+    required: true
+  timeout:
+    description: 'Page load timeout in seconds'
+    required: false
+    default: '15'
+
+outputs:
+  results:
+    description: 'Test results in JSON format'
+    value: ${{ steps.run-tests.outputs.results }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup EnsureUI environment
+      shell: bash
+      run: |
+        npm install --no-save playwright @playwright/test
+
+    - name: Install Playwright browsers
+      shell: bash
+      run: npx playwright install chromium
+
+    - name: Create screenshots directory
+      shell: bash
+      run: mkdir -p screenshots
+
+    - name: Run EnsureUI tests
+      id: run-tests
+      shell: bash
+      run: node ${{ github.action_path }}/ensure-ui.js
+      env:
+        DEPLOYMENT_URL: ${{ inputs.deployment-url }}
+        TIMEOUT: ${{ inputs.timeout }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+        GITHUB_REF: ${{ github.ref }}
+        GITHUB_SHA: ${{ github.sha }}
+        PR_NUMBER: ${{ github.event.number }}
