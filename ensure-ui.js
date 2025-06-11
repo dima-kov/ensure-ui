@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
+const { expect } = require('@playwright/test');
 
 class EnsureUITester {
   constructor() {
@@ -368,13 +369,11 @@ Generate the Playwright assertion code:`;
       // Create a safe execution context
       const testFunction = new Function('page', 'expect', `
         return (async () => {
-          const { expect } = require('@playwright/test');
           ${testCode}
           return true;
         })();
       `);
-
-      await testFunction(page);
+      await testFunction(page, expect);
       return true;
     } catch (error) {
       console.error(`Generated test execution failed: ${error.message}`);
