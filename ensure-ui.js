@@ -13,6 +13,7 @@ class EnsureUITester {
     this.ref = process.env.GITHUB_REF;
     this.sha = process.env.GITHUB_SHA;
     this.prNumber = process.env.PR_NUMBER;
+    this.openaiApiKey = process.env.OPENAI_API_KEY;
 
     this.results = {
       totalPages: 0,
@@ -22,7 +23,7 @@ class EnsureUITester {
     };
   }
 
-  // Part 1: Detect // ensureUI comments
+  // Enhanced comment parsing - extract expectation text
   findEnsureUIPages() {
     const pages = [];
     const searchDirs = ['pages', 'app', 'src/pages', 'src/app'];
@@ -32,13 +33,9 @@ class EnsureUITester {
       const fullDir = path.join(root, dir);
       if (fs.existsSync(fullDir)) {
         console.log(`Scanning directory: ${fullDir}`);
-        const items = fs.readdirSync(fullDir);
-        console.log(`Contents of ${fullDir}:`, items);
         this.scanDirectory(fullDir, pages);
       }
     }
-    console.log('Project root:', root);
-    console.log('Root directory contents:', fs.readdirSync(root));
     return pages;
   }
 
@@ -52,16 +49,67 @@ class EnsureUITester {
       if (stat.isDirectory()) {
         this.scanDirectory(fullPath, pages);
       } else if (this.isPageFile(item)) {
-        if (this.hasEnsureUIComment(fullPath)) {
+        const expectations = this.extractEnsureUIComments(fullPath);
+        if (expectations.length > 0) {
           const route = this.getRouteFromPath(fullPath);
           pages.push({
             filePath: fullPath,
             route: route,
-            url: `${this.deploymentUrl}${route}`
+            url: `${this.deploymentUrl}${route}`,
+            expectations: expectations
           });
         }
       }
     }
+  }
+
+  // Extract expectations from ensureUI comments
+  extractEnsureUIComments(filePath) {
+    try {
+      const content = fs.readFileSync(filePath, 'utf8');
+      const expectations = [];
+      const lines = content.split('\n');
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        // Match: // ensureUI: some expectation text
+        const match = line.match(/\/\/\s*ensureUI:\s*(.+)/i);
+        if (match) {
+          const expectation = match[1].trim();
+          if (this.isValidExpectation(expectation)) {
+            expectations.push({
+              text: expectation,
+              lineNumber: i + 1
+            });
+          } else {
+            console.warn(`Ignoring unsupported expectation at ${filePath}:${i + 1}: "${expectation}"`);
+          }
+        }
+      }
+      return expectations;
+    } catch (error) {
+      console.error(`Error reading file ${filePath}:`, error);
+      return [];
+    }
+  }
+
+  // Validate that expectation is text/content based only
+  isValidExpectation(expectation) {
+    const unsupportedPatterns = [
+      // Flow/interaction patterns
+      /click|navigate|submit|fill|type|select/i,
+      /form.*valid|validate.*form/i,
+      /redirect|route|navigate/i,
+      // Dynamic behavior
+      /hover|focus|blur|change/i,
+      /animation|transition|load.*time/i,
+      // Multi-step flows
+      /then|after|when.*then|step/i,
+      // API/network patterns
+      /api|request|response|ajax|fetch/i
+    ];
+
+    return !unsupportedPatterns.some(pattern => pattern.test(expectation));
   }
 
   isPageFile(filename) {
@@ -73,76 +121,154 @@ class EnsureUITester {
     return pagePatterns.some(pattern => pattern.test(filename));
   }
 
-  hasEnsureUIComment(filePath) {
-    try {
-      const content = fs.readFileSync(filePath, 'utf8');
-      return content.includes('// ensureUI') || content.includes('//ensureUI');
-    } catch (error) {
-      console.error(`Error reading file ${filePath}:`, error);
-      return false;
-    }
-  }
-
   getRouteFromPath(filePath) {
-    // Convert file path to Next.js route
     let route = filePath;
-
-    // Normalize path separators to forward slashes
     route = route.replace(/\\/g, '/');
 
-    // Remove project root - ensure we handle it properly
     if (this.projectRoot) {
       const normalizedRoot = this.projectRoot.replace(/\\/g, '/');
-      // Remove trailing slash from project root for consistent matching
       const cleanRoot = normalizedRoot.replace(/\/$/, '');
       route = route.replace(new RegExp(`^${cleanRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), '');
     }
 
-    // Remove leading slash if present
     route = route.replace(/^\/+/, '');
-
-    // Remove common prefixes (src/, pages/, app/)
     route = route.replace(/^src\//, '');
     route = route.replace(/^pages\//, '');
     route = route.replace(/^app\//, '');
-
-    // Remove Next.js App Router route groups (parentheses)
     route = route.replace(/\([^)]+\)\//g, '');
-
-    // Remove file extensions
     route = route.replace(/\.(js|jsx|ts|tsx)$/, '');
-
-    // Handle Next.js App Router page files
     route = route.replace(/\/page$/, '');
     route = route.replace(/^page$/, '');
-
-    // Handle index files (Pages Router)
     route = route.replace(/\/index$/, '');
     route = route.replace(/^index$/, '');
 
-    // Handle dynamic routes
     route = route.replace(/\[([^\]]+)\]/g, (match, param) => {
-      // For testing, use placeholder values
       if (param === 'id') return '1';
       if (param === 'slug') return 'example';
-      if (param.startsWith('...')) return param.slice(3); // catch-all routes
+      if (param.startsWith('...')) return param.slice(3);
       return param;
     });
 
-    // Ensure route starts with /
     if (!route.startsWith('/')) {
       route = '/' + route;
     }
 
-    // Handle root route
-    if (route === '/') {
-      return '/';
-    }
-
-    return route;
+    return route === '/' ? '/' : route;
   }
 
-  // Part 2 & 3: Run headless browser tests
+  // HTML shrinking - remove noise, keep content structure
+  shrinkHTML(html) {
+    // Remove scripts, styles, comments, and other noise
+    let cleaned = html
+      // Remove script and style blocks entirely
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      // Remove HTML comments
+      .replace(/<!--[\s\S]*?-->/g, '')
+      // Remove most attributes except semantic ones
+      .replace(/\s(?:class|id|style|data-[^=]*?)="[^"]*"/gi, '')
+      // Keep important attributes
+      .replace(/\s(aria-[^=]*?|role|alt|title|placeholder|value|href|src|type|name)="[^"]*"/gi, ' $1="$2"')
+      // Remove empty attributes
+      .replace(/\s[a-zA-Z-]+=""/g, '')
+      // Collapse multiple whitespace
+      .replace(/\s+/g, ' ')
+      // Remove whitespace between tags
+      .replace(/>\s+</g, '><')
+      // Trim
+      .trim();
+
+    // Remove deeply nested empty divs and spans
+    let previousLength;
+    do {
+      previousLength = cleaned.length;
+      cleaned = cleaned
+        .replace(/<(div|span|section|article)\s*><\/(div|span|section|article)>/gi, '')
+        .replace(/<(div|span)\s*>\s*<(div|span)\s*>(.*?)<\/\2>\s*<\/\1>/gi, '<$2>$3</$2>');
+    } while (cleaned.length < previousLength);
+
+    // Limit content length - truncate very long text nodes
+    cleaned = cleaned.replace(/>([^<]{200})[^<]*</g, '>$1...<');
+
+    return cleaned;
+  }
+
+  // Generate LLM prompt for test generation
+  generateLLMPrompt(html, expectation) {
+    return `You are a Playwright testing expert. Generate ONLY the test assertion code.
+
+STRICT RULES:
+- Output ONLY raw Playwright code, no explanations
+- Use await expect() assertions only
+- Focus on text content and element presence
+- Use simple, robust selectors
+- NO interactions (clicks, form fills, navigation)
+- NO flow testing - only static content verification
+
+HTML:
+${html}
+
+User Expectation: "${expectation}"
+
+Generate the Playwright assertion code:`;
+  }
+
+  // Call OpenAI API to generate test code
+  async generateTestCode(html, expectation) {
+    if (!this.openaiApiKey) {
+      throw new Error('OPENAI_API_KEY environment variable is required');
+    }
+
+    const shrunkenHTML = this.shrinkHTML(html);
+    const prompt = this.generateLLMPrompt(shrunkenHTML, expectation);
+
+    console.log(`HTML size: ${html.length} → ${shrunkenHTML.length} (${Math.round(100 - (shrunkenHTML.length / html.length * 100))}% reduction)`);
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini', // Cheaper model for this task
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a Playwright testing expert. Generate only raw executable Playwright assertion code. No explanations, no markdown, no extra text.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 200,
+          temperature: 0.1
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const generatedCode = data.choices[0].message.content.trim();
+
+      // Clean up the generated code - remove markdown if present
+      const cleanCode = generatedCode
+        .replace(/```(?:javascript|js)?\n?/g, '')
+        .replace(/```/g, '')
+        .trim();
+
+      return cleanCode;
+    } catch (error) {
+      console.error('OpenAI API call failed:', error);
+      throw error;
+    }
+  }
+
+  // Enhanced page testing with LLM-generated assertions
   async runPageTest(pageInfo) {
     const browser = await chromium.launch();
     const context = await browser.newContext({
@@ -153,11 +279,10 @@ class EnsureUITester {
     const testResult = {
       ...pageInfo,
       passed: false,
-      checks: {
+      basicChecks: {
         pageLoaded: false,
-        hasHeader: false,
-        hasInteractiveElement: false
       },
+      generatedTests: [],
       consoleErrors: [],
       screenshot: null,
       error: null
@@ -171,30 +296,61 @@ class EnsureUITester {
         }
       });
 
-      // Navigate to page with timeout
+      // Navigate to page
       const response = await page.goto(pageInfo.url, {
         waitUntil: 'networkidle',
         timeout: this.timeout
       });
 
-      // Check 1: Page loaded successfully
-      testResult.checks.pageLoaded = response.status() === 200;
+      // Basic check: page loaded
+      testResult.basicChecks.pageLoaded = response.status() === 200;
 
-      // Check 3: Has header element
-      const headerElements = await page.$$('h1, h2, h3, [role="heading"]');
-      testResult.checks.hasHeader = headerElements.length > 0;
+      if (!testResult.basicChecks.pageLoaded) {
+        throw new Error(`Page failed to load: ${response.status()}`);
+      }
 
-      // Check 4: Has interactive elements
-      const interactiveElements = await page.$$('button, a[href], input, select, textarea');
-      testResult.checks.hasInteractiveElement = interactiveElements.length > 0;
+      // Get HTML content for LLM
+      const htmlContent = await page.content();
 
-      // Part 4: Capture screenshot
+      // Generate and run tests for each expectation
+      for (const expectation of pageInfo.expectations) {
+        console.log(`  Generating test for: "${expectation.text}"`);
+
+        try {
+          const testCode = await this.generateTestCode(htmlContent, expectation.text);
+          console.log(`  Generated code: ${testCode}`);
+
+          // Execute the generated test code
+          const testPassed = await this.executeGeneratedTest(page, testCode);
+
+          testResult.generatedTests.push({
+            expectation: expectation.text,
+            lineNumber: expectation.lineNumber,
+            generatedCode: testCode,
+            passed: testPassed,
+            error: testPassed ? null : 'Assertion failed'
+          });
+
+        } catch (error) {
+          console.error(`  Failed to generate/run test for "${expectation.text}":`, error);
+          testResult.generatedTests.push({
+            expectation: expectation.text,
+            lineNumber: expectation.lineNumber,
+            generatedCode: null,
+            passed: false,
+            error: error.message
+          });
+        }
+      }
+
+      // Take screenshot
       const screenshotPath = `screenshots/${pageInfo.route.replace(/\//g, '_')}.png`;
       await page.screenshot({ path: screenshotPath, fullPage: true });
       testResult.screenshot = screenshotPath;
 
-      // Determine if test passed
-      testResult.passed = Object.values(testResult.checks).every(check => check === true);
+      // Overall test result
+      testResult.passed = testResult.basicChecks.pageLoaded &&
+                         testResult.generatedTests.every(test => test.passed);
 
     } catch (error) {
       testResult.error = error.message;
@@ -206,11 +362,31 @@ class EnsureUITester {
     return testResult;
   }
 
-  // Part 5: Generate report
+  // Execute the LLM-generated test code safely
+  async executeGeneratedTest(page, testCode) {
+    try {
+      // Create a safe execution context
+      const testFunction = new Function('page', 'expect', `
+        return (async () => {
+          const { expect } = require('@playwright/test');
+          ${testCode}
+          return true;
+        })();
+      `);
+
+      await testFunction(page);
+      return true;
+    } catch (error) {
+      console.error(`Generated test execution failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  // Enhanced report generation
   generateReport() {
     const { totalPages, passedPages, failedPages, pages } = this.results;
 
-    let report = `# 🔍 EnsureUI Test Results\n\n`;
+    let report = `# 🤖 EnsureUI Test Results (LLM-Powered)\n\n`;
     report += `**Summary:** ${passedPages}/${totalPages} pages passed\n\n`;
 
     if (failedPages > 0) {
@@ -220,10 +396,21 @@ class EnsureUITester {
         report += `### ${page.route}\n`;
         report += `- **URL:** ${page.url}\n`;
 
-        Object.entries(page.checks).forEach(([check, passed]) => {
-          const icon = passed ? '✅' : '❌';
-          const checkName = check.replace(/([A-Z])/g, ' $1').toLowerCase();
-          report += `- **${checkName}:** ${icon}\n`;
+        // Basic checks
+        if (!page.basicChecks.pageLoaded) {
+          report += `- **Page Load:** ❌ Failed to load\n`;
+        }
+
+        // Generated tests
+        page.generatedTests.forEach(test => {
+          const icon = test.passed ? '✅' : '❌';
+          report += `- **"${test.expectation}":** ${icon}\n`;
+          if (!test.passed && test.error) {
+            report += `  - Error: ${test.error}\n`;
+          }
+          if (test.generatedCode) {
+            report += `  - Generated: \`${test.generatedCode}\`\n`;
+          }
         });
 
         if (page.consoleErrors.length > 0) {
@@ -231,10 +418,6 @@ class EnsureUITester {
           page.consoleErrors.slice(0, 3).forEach(error => {
             report += `  - ${error}\n`;
           });
-        }
-
-        if (page.error) {
-          report += `- **Error:** ${page.error}\n`;
         }
 
         report += '\n';
@@ -245,25 +428,24 @@ class EnsureUITester {
       report += `## ✅ Passed Pages (${passedPages})\n\n`;
 
       pages.filter(p => p.passed).forEach(page => {
-        report += `- ${page.route} - All checks passed ✅\n`;
+        report += `- **${page.route}** - ${page.generatedTests.length} expectations passed ✅\n`;
+        page.generatedTests.forEach(test => {
+          report += `  - "${test.expectation}"\n`;
+        });
       });
     }
 
     return report;
   }
 
-  // Part 6: Post results
   async postResults(report) {
     const promises = [];
 
-    // GitHub PR comment
     if (this.githubToken && this.prNumber) {
       promises.push(this.postGitHubComment(report));
     }
 
-    // Console output
     console.log('\n' + report);
-
     await Promise.allSettled(promises);
   }
 
@@ -290,22 +472,27 @@ class EnsureUITester {
   }
 
   async run() {
-    console.log('🔍 Starting EnsureUI tests...');
+    console.log('🤖 Starting EnsureUI tests with LLM...');
 
-    // Part 1: Find pages with ensureUI comments
+    if (!this.openaiApiKey) {
+      console.error('OPENAI_API_KEY environment variable is required');
+      process.exit(1);
+    }
+
     const pages = this.findEnsureUIPages();
-    console.log(`Found ${pages.length} pages with // ensureUI comments`);
+    const totalExpectations = pages.reduce((sum, page) => sum + page.expectations.length, 0);
+
+    console.log(`Found ${pages.length} pages with ${totalExpectations} expectations`);
 
     if (pages.length === 0) {
-      console.log('No pages found with // ensureUI comments. Skipping tests.');
+      console.log('No pages found with // ensureUI: comments. Skipping tests.');
       return;
     }
 
     this.results.totalPages = pages.length;
 
-    // Part 2-4: Test each page
     for (const pageInfo of pages) {
-      console.log(`Testing: ${pageInfo.url}`);
+      console.log(`Testing: ${pageInfo.url} (${pageInfo.expectations.length} expectations)`);
       const result = await this.runPageTest(pageInfo);
       this.results.pages.push(result);
 
@@ -318,16 +505,11 @@ class EnsureUITester {
       }
     }
 
-    // Part 5: Generate report
     const report = this.generateReport();
-
-    // Part 6: Post results
     await this.postResults(report);
 
-    // Set GitHub Actions output
     console.log(`::set-output name=results::${JSON.stringify(this.results)}`);
 
-    // Exit with error code if tests failed
     if (this.results.failedPages > 0) {
       process.exit(1);
     }
