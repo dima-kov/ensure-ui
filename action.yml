@@ -1,4 +1,3 @@
-# .github/actions/ensure-ui/action.yml
 name: 'EnsureUI Testing Action'
 description: 'Automated UI testing for pages marked with // ensureUI comment'
 inputs:
@@ -23,18 +22,22 @@ runs:
   steps:
     - name: Setup EnsureUI environment
       run: npm install --no-save playwright @playwright/test
+      shell: bash
       working-directory: ${{ github.action_path }}
 
     - name: Install Playwright browsers
       run: npx playwright install chromium
+      shell: bash
       working-directory: ${{ github.action_path }}
 
     - name: Create screenshots directory
       run: mkdir -p screenshots
+      shell: bash
 
     - name: Run EnsureUI tests
       id: run-tests
       run: node ensure-ui.js
+      shell: bash
       working-directory: ${{ github.action_path }}
       env:
         DEPLOYMENT_URL: ${{ inputs.deployment-url }}
