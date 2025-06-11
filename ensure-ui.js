@@ -86,6 +86,7 @@ class EnsureUITester {
   getRouteFromPath(filePath) {
     // Convert file path to Next.js route
     let route = filePath;
+    route = route.replace(this.projectRoot, '');
 
     // Remove common prefixes
     route = route.replace(/^(src\/)?pages\//, '');
