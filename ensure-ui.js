@@ -86,16 +86,37 @@ class EnsureUITester {
   getRouteFromPath(filePath) {
     // Convert file path to Next.js route
     let route = filePath;
-    route = route.replace(this.projectRoot, '');
 
-    // Remove common prefixes
-    route = route.replace(/^(src\/)?pages\//, '');
-    route = route.replace(/^(src\/)?app\//, '');
+    // Normalize path separators to forward slashes
+    route = route.replace(/\\/g, '/');
 
-    // Remove file extension
+    // Remove project root - ensure we handle it properly
+    if (this.projectRoot) {
+      const normalizedRoot = this.projectRoot.replace(/\\/g, '/');
+      // Remove trailing slash from project root for consistent matching
+      const cleanRoot = normalizedRoot.replace(/\/$/, '');
+      route = route.replace(new RegExp(`^${cleanRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), '');
+    }
+
+    // Remove leading slash if present
+    route = route.replace(/^\/+/, '');
+
+    // Remove common prefixes (src/, pages/, app/)
+    route = route.replace(/^src\//, '');
+    route = route.replace(/^pages\//, '');
+    route = route.replace(/^app\//, '');
+
+    // Remove Next.js App Router route groups (parentheses)
+    route = route.replace(/\([^)]+\)\//g, '');
+
+    // Remove file extensions
     route = route.replace(/\.(js|jsx|ts|tsx)$/, '');
 
-    // Handle index files
+    // Handle Next.js App Router page files
+    route = route.replace(/\/page$/, '');
+    route = route.replace(/^page$/, '');
+
+    // Handle index files (Pages Router)
     route = route.replace(/\/index$/, '');
     route = route.replace(/^index$/, '');
 
@@ -104,6 +125,7 @@ class EnsureUITester {
       // For testing, use placeholder values
       if (param === 'id') return '1';
       if (param === 'slug') return 'example';
+      if (param.startsWith('...')) return param.slice(3); // catch-all routes
       return param;
     });
 
