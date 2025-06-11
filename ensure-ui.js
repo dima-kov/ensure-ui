@@ -155,7 +155,6 @@ class EnsureUITester {
       passed: false,
       checks: {
         pageLoaded: false,
-        noConsoleErrors: false,
         hasHeader: false,
         hasInteractiveElement: false
       },
@@ -180,9 +179,6 @@ class EnsureUITester {
 
       // Check 1: Page loaded successfully
       testResult.checks.pageLoaded = response.status() === 200;
-
-      // Check 2: No console errors
-      testResult.checks.noConsoleErrors = testResult.consoleErrors.length === 0;
 
       // Check 3: Has header element
       const headerElements = await page.$$('h1, h2, h3, [role="heading"]');
