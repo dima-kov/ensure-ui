@@ -28,10 +28,14 @@ class EnsureUITester {
 
     for (const dir of searchDirs) {
       if (fs.existsSync(dir)) {
+        console.log(`Scanning directory: ${dir}`);
+        const items = fs.readdirSync(dir);
+        console.log(`Contents of ${dir}:`, items);
         this.scanDirectory(dir, pages);
       }
     }
-
+    console.log('Current working directory:', process.cwd());
+    console.log('Directory contents:', fs.readdirSync(process.cwd()));
     return pages;
   }
 
