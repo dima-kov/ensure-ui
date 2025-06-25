@@ -319,12 +319,20 @@ Generate the Playwright assertion code:`;
 
 
 STRICT RULES:
-- Never use unstable or dynamic attributes like auto-generated IDs, names, or React keys (e.g., :R5qlttt6la:).
-- Prefer getByRole(), getByLabel(), or data-testid attributes. Do not rely on DOM structure (like + div input). 
-Placeholders are acceptable only if no better selector exists. 
-- Complete all described steps fully — test must reach the final expected page and assert it.
-- If only unstable attributes are found, throw an error comment like: // Cannot generate test: selectors are not stable.
-- Output only raw code (no markdown, no explanation, no comments unless it's a failure reason).
+You are a Playwright end-to-end testing expert. Generate raw, executable Playwright test code that follows the entire user flow described.
+
+STRICT RULES:
+- Include both actions (like form filling, clicking buttons) and assertions (like page content and URL checks).
+- Use only stable selectors:
+  – Prefer getByRole(), getByLabel(), or getByText() where available.
+  – Use data-testid if semantic selectors are not present.
+  – Only use placeholders as a last resort.
+  – Never use auto-generated IDs or attributes (e.g., :Rxyz:), or structure-based selectors like label + div input.
+- If a required element has no stable selector, insert a line like:
+// ERROR: No stable selector for [element description].
+- Complete the entire described flow — from the initial state to the final expected page.
+- Output only raw code. No markdown, no explanations, no comments (except error notes as above).
+
     `;
     if (!this.openaiApiKey) {
       throw new Error('OPENAI_API_KEY environment variable is required');
