@@ -301,17 +301,7 @@ class EnsureUITester {
 
   // Generate LLM prompt for test generation
   generateLLMPrompt(html, expectation) {
-    return `You are a Playwright testing expert. Generate ONLY the test assertion code.
-
-STRICT RULES:
-- Output ONLY raw Playwright code, no explanations
-- Use await expect() assertions only
-- Focus on text content and element presence
-- Use simple, robust selectors
-- NO interactions (clicks, form fills, navigation)
-- NO flow testing - only static content verification
-
-HTML:
+    return `HTML:
 ${html}
 
 User Expectation: "${expectation}"
@@ -321,6 +311,17 @@ Generate the Playwright assertion code:`;
 
   // Call OpenAI API to generate test code
   async generateTestCode(html, expectation) {
+    const SYSTEM_PROMPT = ```
+    You are a Playwright E2E testing expert. Generate raw, executable Playwright test code that follows the full 
+    user flow described. Your output must include both actions (form filling, clicks, etc.) and assertions 
+    (URL, text, etc.).
+
+STRICT RULES:
+- Never use unstable or dynamic attributes like auto-generated IDs, names, or React keys (e.g., :R5qlttt6la:).
+- Use semantic and stable selectors: text content, \`getByRole\`, \`getByLabel\`, or \`data-testid\`.
+- If only unstable attributes are found, throw an error comment like: // Cannot generate test: selectors are not stable.
+- Output only raw code (no markdown, no explanation, no comments unless it's a failure reason).
+    ```
     if (!this.openaiApiKey) {
       throw new Error('OPENAI_API_KEY environment variable is required');
     }
@@ -342,7 +343,7 @@ Generate the Playwright assertion code:`;
           messages: [
             {
               role: 'system',
-              content: 'You are a Playwright testing expert. Generate only raw executable Playwright assertion code. No explanations, no markdown, no extra text.'
+              content: SYSTEM_PROMPT
             },
             {
               role: 'user',
