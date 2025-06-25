@@ -331,8 +331,8 @@ STRICT RULES:
 - If a required element has no stable selector, insert a line like:
 // ERROR: No stable selector for [element description].
 - Complete the entire described flow — from the initial state to the final expected page.
-- Output only raw code. No markdown, no explanations, no comments (except error notes as above).
-
+- Output only raw code. No markdown, no explanations, no comments (except error notes as above). 
+- Generate only the test body. Do not include 'test(...)' or import statements. Assume 'page' and 'expect' are already in scope.
     `;
     if (!this.openaiApiKey) {
       throw new Error('OPENAI_API_KEY environment variable is required');
