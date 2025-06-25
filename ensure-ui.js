@@ -316,9 +316,13 @@ Generate the Playwright assertion code:`;
     user flow described. Your output must include both actions (form filling, clicks, etc.) and assertions 
     (URL, text, etc.).
 
+
+
 STRICT RULES:
 - Never use unstable or dynamic attributes like auto-generated IDs, names, or React keys (e.g., :R5qlttt6la:).
-- Use semantic and stable selectors: text content, \`getByRole\`, \`getByLabel\`, or \`data-testid\`.
+- Prefer getByRole(), getByLabel(), or data-testid attributes. Do not rely on DOM structure (like + div input). 
+Placeholders are acceptable only if no better selector exists. 
+- Complete all described steps fully — test must reach the final expected page and assert it.
 - If only unstable attributes are found, throw an error comment like: // Cannot generate test: selectors are not stable.
 - Output only raw code (no markdown, no explanation, no comments unless it's a failure reason).
     `;
