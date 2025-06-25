@@ -1,5 +1,5 @@
 name: 'EnsureUI'
-description: 'Automated UI testing using natural language expectations and LLM-generated assertions'
+description: 'Advanced LLM-powered UI testing with natural language expectations, multi-line comments, and user flow testing'
 inputs:
   deployment-url:
     description: 'URL of the deployed application'

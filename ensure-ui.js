@@ -20,16 +20,26 @@ class EnsureUITester {
       totalPages: 0,
       passedPages: 0,
       failedPages: 0,
-      pages: []
+      pages: [],
+      flows: []
+    };
+    
+    this.flowState = {
+      currentStep: 0,
+      variables: {},
+      cookies: [],
+      localStorage: {}
     };
   }
 
-  // Enhanced comment parsing - extract expectation text
+  // Find both page-level tests and flow definition files
   findEnsureUIPages() {
     const pages = [];
+    const flows = [];
     const searchDirs = ['pages', 'app', 'src/pages', 'src/app'];
     const root = this.projectRoot || process.cwd();
 
+    // Scan for page-level tests
     for (const dir of searchDirs) {
       const fullDir = path.join(root, dir);
       if (fs.existsSync(fullDir)) {
@@ -37,7 +47,40 @@ class EnsureUITester {
         this.scanDirectory(fullDir, pages);
       }
     }
+    
+    // Look for ensure.md flow files
+    const flowFiles = this.findFlowFiles(root);
+    for (const flowFile of flowFiles) {
+      const flowTests = this.parseFlowFile(flowFile);
+      flows.push(...flowTests);
+    }
+    
+    this.results.flows = flows;
     return pages;
+  }
+
+  // Find ensure.md files in the project
+  findFlowFiles(rootDir) {
+    const flowFiles = [];
+    
+    const scanDir = (dir) => {
+      if (!fs.existsSync(dir)) return;
+      const items = fs.readdirSync(dir);
+      
+      for (const item of items) {
+        const fullPath = path.join(dir, item);
+        const stat = fs.statSync(fullPath);
+        
+        if (stat.isDirectory() && !item.startsWith('.') && item !== 'node_modules') {
+          scanDir(fullPath);
+        } else if (item === 'ensure.md') {
+          flowFiles.push(fullPath);
+        }
+      }
+    };
+    
+    scanDir(rootDir);
+    return flowFiles;
   }
 
   scanDirectory(dirPath, pages) {
@@ -64,7 +107,7 @@ class EnsureUITester {
     }
   }
 
-  // Extract expectations from ensureUI comments
+  // Extract expectations from ensureUI comments (supports multi-line)
   extractEnsureUIComments(filePath) {
     try {
       const content = fs.readFileSync(filePath, 'utf8');
@@ -73,17 +116,31 @@ class EnsureUITester {
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
-        // Match: // ensureUI: some expectation text
-        const match = line.match(/\/\/\s*ensureUI:\s*(.+)/i);
-        if (match) {
-          const expectation = match[1].trim();
-          if (this.isValidExpectation(expectation)) {
+        
+        // Match: // ensureUI: single line expectation
+        const singleLineMatch = line.match(/\/\/\s*ensureUI:\s*(.+)/i);
+        if (singleLineMatch) {
+          const expectation = singleLineMatch[1].trim();
+          expectations.push({
+            text: expectation,
+            lineNumber: i + 1,
+            type: 'static'
+          });
+          continue;
+        }
+        
+        // Match: // ensureUI (start of multi-line)
+        const multiLineStart = line.match(/\/\/\s*ensureUI\s*$/i);
+        if (multiLineStart) {
+          const multiLineExpectation = this.extractMultiLineExpectation(lines, i);
+          if (multiLineExpectation) {
             expectations.push({
-              text: expectation,
-              lineNumber: i + 1
+              text: multiLineExpectation.text,
+              lineNumber: i + 1,
+              type: multiLineExpectation.type,
+              endLineNumber: multiLineExpectation.endLineNumber
             });
-          } else {
-            console.warn(`Ignoring unsupported expectation at ${filePath}:${i + 1}: "${expectation}"`);
+            i = multiLineExpectation.endLineNumber - 1; // Skip processed lines
           }
         }
       }
@@ -94,20 +151,68 @@ class EnsureUITester {
     }
   }
 
-  // Validate that expectation is text/content based only
-  isValidExpectation(expectation) {
+  // Extract multi-line ensureUI comment block
+  extractMultiLineExpectation(lines, startIndex) {
+    let expectationText = '';
+    let currentIndex = startIndex + 1;
+    let isFlow = false;
+    
+    while (currentIndex < lines.length) {
+      const line = lines[currentIndex].trim();
+      
+      // Check if line is a comment continuation
+      const commentMatch = line.match(/\/\/\s*(.*)/);
+      if (!commentMatch) {
+        break; // End of comment block
+      }
+      
+      const commentText = commentMatch[1].trim();
+      if (commentText === '') {
+        currentIndex++;
+        continue; // Empty comment line
+      }
+      
+      // Detect flow keywords
+      if (this.isFlowKeyword(commentText)) {
+        isFlow = true;
+      }
+      
+      expectationText += (expectationText ? ' ' : '') + commentText;
+      currentIndex++;
+    }
+    
+    if (!expectationText) {
+      return null;
+    }
+    
+    return {
+      text: expectationText,
+      type: isFlow ? 'flow' : 'static',
+      endLineNumber: currentIndex - 1
+    };
+  }
+
+  // Check if comment contains flow keywords
+  isFlowKeyword(text) {
+    const flowKeywords = [
+      'click', 'fill', 'submit', 'navigate', 'type', 'select',
+      'then', 'after', 'when', 'should', 'user',
+      'login', 'redirect', 'form', 'button', 'input'
+    ];
+    return flowKeywords.some(keyword => 
+      new RegExp(`\\b${keyword}\\b`, 'i').test(text)
+    );
+  }
+
+  // Validate expectation (now supports both static and flow)
+  isValidExpectation(expectation, type = 'static') {
+    if (type === 'flow') {
+      return true; // Flow expectations support all interactions
+    }
+    
+    // For static expectations, keep original restrictions
     const unsupportedPatterns = [
-      // Flow/interaction patterns
-      /click|navigate|submit|fill|type|select/i,
-      /form.*valid|validate.*form/i,
-      /redirect|route|navigate/i,
-      // Dynamic behavior
-      /hover|focus|blur|change/i,
-      /animation|transition|load.*time/i,
-      // Multi-step flows
-      /then|after|when.*then|step/i,
-      // API/network patterns
-      /api|request|response|ajax|fetch/i
+      /api|request|response|ajax|fetch/i // Only block API patterns for static
     ];
 
     return !unsupportedPatterns.some(pattern => pattern.test(expectation));
@@ -383,11 +488,35 @@ Generate the Playwright assertion code:`;
 
   // Enhanced report generation
   generateReport() {
-    const { totalPages, passedPages, failedPages, pages } = this.results;
+    const { totalPages, passedPages, failedPages, pages, flows } = this.results;
+    const passedFlows = flows.filter(f => f.passed).length;
+    const failedFlows = flows.filter(f => !f.passed).length;
 
     let report = `# 🤖 EnsureUI Test Results (LLM-Powered)\n\n`;
-    report += `**Summary:** ${passedPages}/${totalPages} pages passed\n\n`;
+    report += `**Summary:** ${passedPages}/${totalPages} pages passed, ${passedFlows}/${flows.length} flows passed\n\n`;
 
+    // Failed flows
+    if (failedFlows > 0) {
+      report += `## ❌ Failed Flows (${failedFlows})\n\n`;
+      
+      flows.filter(f => !f.passed).forEach(flow => {
+        report += `### 🔄 ${flow.name}\n`;
+        report += `- **Description:** ${flow.description || 'No description'}\n`;
+        report += `- **Steps:** ${flow.steps.length}\n`;
+        
+        flow.steps.forEach((step, index) => {
+          const icon = step.passed ? '✅' : '❌';
+          report += `  ${index + 1}. ${icon} ${step.description}\n`;
+          if (!step.passed && step.error) {
+            report += `     - Error: ${step.error}\n`;
+          }
+        });
+        
+        report += '\n';
+      });
+    }
+
+    // Failed pages
     if (failedPages > 0) {
       report += `## ❌ Failed Pages (${failedPages})\n\n`;
 
@@ -403,7 +532,8 @@ Generate the Playwright assertion code:`;
         // Generated tests
         page.generatedTests.forEach(test => {
           const icon = test.passed ? '✅' : '❌';
-          report += `- **"${test.expectation}":** ${icon}\n`;
+          const typeLabel = test.type === 'flow' ? '🔄' : '📝';
+          report += `- ${typeLabel} **"${test.expectation}":** ${icon}\n`;
           if (!test.passed && test.error) {
             report += `  - Error: ${test.error}\n`;
           }
@@ -423,13 +553,26 @@ Generate the Playwright assertion code:`;
       });
     }
 
+    // Passed flows
+    if (passedFlows > 0) {
+      report += `## ✅ Passed Flows (${passedFlows})\n\n`;
+      
+      flows.filter(f => f.passed).forEach(flow => {
+        report += `- **🔄 ${flow.name}** - ${flow.steps.length} steps completed ✅\n`;
+      });
+      
+      report += '\n';
+    }
+
+    // Passed pages
     if (passedPages > 0) {
       report += `## ✅ Passed Pages (${passedPages})\n\n`;
 
       pages.filter(p => p.passed).forEach(page => {
         report += `- **${page.route}** - ${page.generatedTests.length} expectations passed ✅\n`;
         page.generatedTests.forEach(test => {
-          report += `  - "${test.expectation}"\n`;
+          const typeLabel = test.type === 'flow' ? '🔄' : '📝';
+          report += `  - ${typeLabel} "${test.expectation}"\n`;
         });
       });
     }
@@ -470,6 +613,189 @@ Generate the Playwright assertion code:`;
     }
   }
 
+  // Parse ensure.md flow files
+  parseFlowFile(filePath) {
+    try {
+      const content = fs.readFileSync(filePath, 'utf8');
+      const flows = [];
+      const lines = content.split('\n');
+      
+      let currentFlow = null;
+      let inCodeBlock = false;
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        // Skip empty lines and code blocks
+        if (!line || line.startsWith('```')) {
+          inCodeBlock = !inCodeBlock;
+          continue;
+        }
+        
+        if (inCodeBlock) continue;
+        
+        // Flow header: # Flow Name
+        if (line.startsWith('# ')) {
+          if (currentFlow) {
+            flows.push(currentFlow);
+          }
+          currentFlow = {
+            name: line.substring(2).trim(),
+            description: '',
+            steps: [],
+            variables: {},
+            passed: false,
+            error: null,
+            type: 'flow'
+          };
+          continue;
+        }
+        
+        if (!currentFlow) continue;
+        
+        // Description
+        if (line.startsWith('> ')) {
+          currentFlow.description += line.substring(2) + ' ';
+          continue;
+        }
+        
+        // Variables: @variable = value
+        if (line.startsWith('@')) {
+          const varMatch = line.match(/@(\w+)\s*=\s*(.+)/);
+          if (varMatch) {
+            currentFlow.variables[varMatch[1]] = varMatch[2].replace(/["']/g, '');
+          }
+          continue;
+        }
+        
+        // Step: 1. Step description
+        const stepMatch = line.match(/^(\d+)\. (.+)/);
+        if (stepMatch) {
+          const stepDescription = stepMatch[2];
+          currentFlow.steps.push({
+            description: stepDescription,
+            url: this.extractUrl(stepDescription),
+            passed: false,
+            error: null,
+            generatedCode: null
+          });
+        }
+      }
+      
+      if (currentFlow) {
+        flows.push(currentFlow);
+      }
+      
+      return flows;
+    } catch (error) {
+      console.error(`Error parsing flow file ${filePath}:`, error);
+      return [];
+    }
+  }
+  
+  // Extract URL from step description
+  extractUrl(stepDescription) {
+    const urlMatch = stepDescription.match(/(?:navigate to|go to|visit|on page)\s+([\w\/\-]+)/i);
+    if (urlMatch) {
+      const path = urlMatch[1].startsWith('/') ? urlMatch[1] : '/' + urlMatch[1];
+      return `${this.deploymentUrl}${path}`;
+    }
+    return null;
+  }
+  
+  // Run a complete flow test
+  async runFlowTest(flowInfo) {
+    const browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 720 }
+    });
+    const page = await context.newPage();
+    
+    // Reset flow state for new flow
+    this.flowState = {
+      currentStep: 0,
+      variables: {...flowInfo.variables},
+      cookies: [],
+      localStorage: {}
+    };
+    
+    const testResult = {
+      ...flowInfo,
+      passed: false,
+      steps: [...flowInfo.steps],
+      screenshots: [],
+      error: null
+    };
+    
+    try {
+      console.log(`  Starting flow: ${flowInfo.name}`);
+      
+      for (let i = 0; i < flowInfo.steps.length; i++) {
+        const step = flowInfo.steps[i];
+        console.log(`  Step ${i + 1}: ${step.description}`);
+        
+        try {
+          // Navigate if step has URL
+          if (step.url) {
+            await page.goto(step.url, {
+              waitUntil: 'networkidle',
+              timeout: this.timeout
+            });
+          }
+          
+          // Get current HTML
+          const htmlContent = await page.content();
+          
+          // Generate test code for this step
+          const testCode = await this.generateTestCode(htmlContent, step.description, 'flow');
+          step.generatedCode = testCode;
+          
+          // Execute the generated test code
+          const stepPassed = await this.executeGeneratedTest(page, testCode, 'flow');
+          step.passed = stepPassed;
+          
+          if (!stepPassed) {
+            step.error = 'Flow step failed';
+            break;
+          }
+          
+          // Take screenshot after each step
+          const screenshotPath = `screenshots/flow_${flowInfo.name.replace(/\s+/g, '_')}_step_${i + 1}.png`;
+          await page.screenshot({ path: screenshotPath, fullPage: true });
+          testResult.screenshots.push(screenshotPath);
+          
+          // Save state after each step
+          this.flowState.cookies = await context.cookies();
+          this.flowState.localStorage = await page.evaluate(() => {
+            const storage = {};
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              storage[key] = localStorage.getItem(key);
+            }
+            return storage;
+          });
+          
+        } catch (error) {
+          step.passed = false;
+          step.error = error.message;
+          console.error(`  Step ${i + 1} failed:`, error);
+          break;
+        }
+      }
+      
+      // Overall flow result
+      testResult.passed = testResult.steps.every(step => step.passed);
+      
+    } catch (error) {
+      testResult.error = error.message;
+      console.error(`Flow ${flowInfo.name} failed:`, error);
+    } finally {
+      await browser.close();
+    }
+    
+    return testResult;
+  }
+
   async run() {
     console.log('🤖 Starting EnsureUI tests with LLM...');
 
@@ -479,17 +805,21 @@ Generate the Playwright assertion code:`;
     }
 
     const pages = this.findEnsureUIPages();
+    const flows = this.results.flows;
     const totalExpectations = pages.reduce((sum, page) => sum + page.expectations.length, 0);
+    const totalFlowSteps = flows.reduce((sum, flow) => sum + flow.steps.length, 0);
 
     console.log(`Found ${pages.length} pages with ${totalExpectations} expectations`);
+    console.log(`Found ${flows.length} flows with ${totalFlowSteps} total steps`);
 
-    if (pages.length === 0) {
-      console.log('No pages found with // ensureUI: comments. Skipping tests.');
+    if (pages.length === 0 && flows.length === 0) {
+      console.log('No tests found. Add // ensureUI comments or create ensure.md files.');
       return;
     }
 
     this.results.totalPages = pages.length;
 
+    // Run page-level tests
     for (const pageInfo of pages) {
       console.log(`Testing: ${pageInfo.url} (${pageInfo.expectations.length} expectations)`);
       const result = await this.runPageTest(pageInfo);
@@ -503,13 +833,27 @@ Generate the Playwright assertion code:`;
         console.log(`❌ ${pageInfo.route} - FAILED`);
       }
     }
+    
+    // Run flow tests
+    for (const flowInfo of flows) {
+      console.log(`Testing flow: ${flowInfo.name} (${flowInfo.steps.length} steps)`);
+      const result = await this.runFlowTest(flowInfo);
+      this.results.flows[this.results.flows.indexOf(flowInfo)] = result;
+      
+      if (result.passed) {
+        console.log(`✅ Flow ${flowInfo.name} - PASSED`);
+      } else {
+        console.log(`❌ Flow ${flowInfo.name} - FAILED`);
+      }
+    }
 
     const report = this.generateReport();
     await this.postResults(report);
 
     console.log(`::set-output name=results::${JSON.stringify(this.results)}`);
 
-    if (this.results.failedPages > 0) {
+    const totalFailed = this.results.failedPages + this.results.flows.filter(f => !f.passed).length;
+    if (totalFailed > 0) {
       process.exit(1);
     }
   }
