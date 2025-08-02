@@ -236,7 +236,6 @@ Generate the Playwright test code:`;
     const shrunkenHTML = this.shrinkHTML(html);
     const prompt = this.generateLLMPrompt(shrunkenHTML, expectation);
 
-    console.log(`HTML size: ${html.length} → ${shrunkenHTML.length} (${Math.round(100 - (shrunkenHTML.length / html.length * 100))}% reduction)`);
 
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -494,11 +493,14 @@ Generate the Playwright test code:`;
       const pageInfo = pages[i];
       const pageNum = i + 1;
       
-      console.log(`\n${'='.repeat(80)}`);
-      console.log(`🌐 PAGE ${pageNum}/${pages.length}: ${pageInfo.route}`);
+      // Only show separator between pages (not before first page)
+      if (i > 0) {
+        console.log(`\n${'='.repeat(80)}`);
+      }
+      
+      console.log(`\n🌐 ${pageInfo.route}`);
       console.log(`   URL: ${pageInfo.url}`);
       console.log(`   Expectations: ${pageInfo.expectations.length}`);
-      console.log('='.repeat(80));
       
       const result = await this.runPageTest(pageInfo);
       this.results.pages.push(result);
