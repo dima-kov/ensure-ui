@@ -76,7 +76,7 @@ class EnsureUITester {
         const line = lines[i].trim();
         
         // Match: // ensureUI: some expectation text
-        const singleLineMatch = line.match(/\/\/\s*ensureUI:\s*(.+)/i);
+        const singleLineMatch = line.match(/\/\/\s*ensureUI\s*(.+)/i);
         if (singleLineMatch) {
           // Check if this starts a multi-line expectation
           const startLineNumber = i + 1;
@@ -565,7 +565,7 @@ Return JSON array of individual expectations:`;
     console.log(`Found ${pages.length} pages with ${totalExpectations} expectations`);
 
     if (pages.length === 0) {
-      console.log('No pages found with // ensureUI: comments. Skipping tests.');
+      console.log('No pages found with // ensureUI comments. Skipping tests.');
       return;
     }
 
