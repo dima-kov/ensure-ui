@@ -233,14 +233,16 @@ class EnsureUITester {
   }
 
   // Generate LLM prompt for test generation
-  generateLLMPrompt(html, expectation) {
+  generateLLMPrompt(html, expectation, currentUrl) {
     return `You are a Playwright testing expert. Generate ONLY the test code to verify the expectation.
 
 IMPORTANT CONTEXT:
 - The page is already loaded and available as 'page'
+- Current URL being tested: ${currentUrl}
 - Test the CURRENT page content and behavior
 - Do NOT navigate to other URLs unless the expectation specifically requires it
 - The HTML provided is from the current page being tested
+- For redirect tests: test if the CURRENT page redirects when accessed, not navigation to other pages
 
 RULES:
 - Output ONLY raw Playwright code, no explanations, no markdown
@@ -328,13 +330,13 @@ Return JSON array of individual expectations:`;
   }
 
   // Call OpenAI API to generate test code
-  async generateTestCode(html, expectation) {
+  async generateTestCode(html, expectation, currentUrl) {
     if (!this.openaiApiKey) {
       throw new Error('OPENAI_API_KEY environment variable is required');
     }
 
     const shrunkenHTML = this.shrinkHTML(html);
-    const prompt = this.generateLLMPrompt(shrunkenHTML, expectation);
+    const prompt = this.generateLLMPrompt(shrunkenHTML, expectation, currentUrl);
 
 
     try {
@@ -433,7 +435,7 @@ Return JSON array of individual expectations:`;
         console.log(`\n    ${testNum}. Testing: "${expectation.text}"`);
 
         try {
-          const testCode = await this.generateTestCode(htmlContent, expectation.text);
+          const testCode = await this.generateTestCode(htmlContent, expectation.text, pageInfo.url);
           const testPassed = await this.executeGeneratedTest(page, testCode);
 
           testResult.generatedTests.push({
