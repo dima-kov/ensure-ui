@@ -25,7 +25,7 @@ class EnsureUITester {
   }
 
   // Enhanced comment parsing - extract expectation text
-  findEnsureUIPages() {
+  async findEnsureUIPages() {
     const pages = [];
     const searchDirs = ['pages', 'app', 'src/pages', 'src/app'];
     const root = this.projectRoot || process.cwd();
@@ -34,13 +34,13 @@ class EnsureUITester {
       const fullDir = path.join(root, dir);
       if (fs.existsSync(fullDir)) {
         console.log(`Scanning directory: ${fullDir}`);
-        this.scanDirectory(fullDir, pages);
+        await this.scanDirectory(fullDir, pages);
       }
     }
     return pages;
   }
 
-  scanDirectory(dirPath, pages) {
+  async scanDirectory(dirPath, pages) {
     const items = fs.readdirSync(dirPath);
 
     for (const item of items) {
@@ -48,9 +48,9 @@ class EnsureUITester {
       const stat = fs.statSync(fullPath);
 
       if (stat.isDirectory()) {
-        this.scanDirectory(fullPath, pages);
+        await this.scanDirectory(fullPath, pages);
       } else if (this.isPageFile(item)) {
-        const expectations = this.extractEnsureUIComments(fullPath);
+        const expectations = await this.extractEnsureUIComments(fullPath);
         if (expectations.length > 0) {
           const route = this.getRouteFromPath(fullPath);
           pages.push({
@@ -64,13 +64,14 @@ class EnsureUITester {
     }
   }
 
-  // Extract expectations from ensureUI comments (supports multi-line)
-  extractEnsureUIComments(filePath) {
+  // Extract expectations from ensureUI comments (supports multi-line) and split via LLM
+  async extractEnsureUIComments(filePath) {
     try {
       const content = fs.readFileSync(filePath, 'utf8');
-      const expectations = [];
+      const rawComments = [];
       const lines = content.split('\n');
 
+      // First pass: Extract raw comments (same as before)
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         
@@ -110,12 +111,38 @@ class EnsureUITester {
           // Skip the lines we've already processed
           i = currentLine - 1;
           
-          expectations.push({
+          rawComments.push({
             text: fullExpectation,
             lineNumber: startLineNumber
           });
         }
       }
+
+      // Second pass: Split each raw comment into individual expectations using LLM
+      const expectations = [];
+      for (const comment of rawComments) {
+        try {
+          const splitExpectations = await this.splitExpectations(comment.text);
+          
+          // Add each split expectation with the same line number
+          for (const expectationText of splitExpectations) {
+            expectations.push({
+              text: expectationText.trim(),
+              lineNumber: comment.lineNumber,
+              originalComment: comment.text // Keep reference to original
+            });
+          }
+        } catch (error) {
+          console.error(`Failed to split expectation: ${comment.text}`, error);
+          // Fallback: use original comment as single expectation
+          expectations.push({
+            text: comment.text,
+            lineNumber: comment.lineNumber,
+            originalComment: comment.text
+          });
+        }
+      }
+
       return expectations;
     } catch (error) {
       console.error(`Error reading file ${filePath}:`, error);
@@ -225,6 +252,73 @@ ${html}
 User Expectation: "${expectation}"
 
 Generate the Playwright test code:`;
+  }
+
+  // Split a single comment into multiple testable expectations using LLM
+  async splitExpectations(commentText) {
+    if (!this.openaiApiKey) {
+      throw new Error('OPENAI_API_KEY environment variable is required');
+    }
+
+    const prompt = `You are a test expectation analyzer. Split the following UI testing expectation into individual, specific, testable assertions.
+
+RULES:
+- Each expectation should test ONE specific thing
+- Output as JSON array of strings
+- Be specific and actionable
+- Preserve the original intent
+- If there's only one expectation, return array with one item
+
+Comment: "${commentText}"
+
+Return JSON array of individual expectations:`;
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system', 
+              content: 'You are a test expectation analyzer. Split UI testing expectations into individual testable assertions. Return only valid JSON array of strings.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 300,
+          temperature: 0.1
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const result = data.choices[0].message.content.trim();
+      
+      // Clean and parse JSON
+      const cleanResult = result.replace(/```json\n?/g, '').replace(/```/g, '').trim();
+      const expectations = JSON.parse(cleanResult);
+      
+      // Validate it's an array of strings
+      if (!Array.isArray(expectations) || !expectations.every(exp => typeof exp === 'string')) {
+        throw new Error('Invalid response format from LLM');
+      }
+      
+      return expectations;
+    } catch (error) {
+      console.error('LLM expectation splitting failed:', error);
+      // Fallback: return original comment as single expectation
+      return [commentText];
+    }
   }
 
   // Call OpenAI API to generate test code
@@ -475,7 +569,7 @@ Generate the Playwright test code:`;
       process.exit(1);
     }
 
-    const pages = this.findEnsureUIPages();
+    const pages = await this.findEnsureUIPages();
     const totalExpectations = pages.reduce((sum, page) => sum + page.expectations.length, 0);
 
     console.log(`Found ${pages.length} pages with ${totalExpectations} expectations`);
