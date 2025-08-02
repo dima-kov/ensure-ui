@@ -326,8 +326,6 @@ Generate the Playwright test code:`;
       const htmlContent = await page.content();
 
       // Generate and run tests for each expectation
-      console.log(`\n  📝 Testing ${pageInfo.expectations.length} expectation(s):`);
-      
       for (let i = 0; i < pageInfo.expectations.length; i++) {
         const expectation = pageInfo.expectations[i];
         const testNum = i + 1;
@@ -512,10 +510,10 @@ Generate the Playwright test code:`;
       
       if (result.passed) {
         this.results.passedPages++;
-        console.log(`  🎉 ${pageInfo.route} - OVERALL: ✅ PASSED`);
+        console.log(`  🎉 OVERALL: ✅ PASSED`);
       } else {
         this.results.failedPages++;
-        console.log(`  💥 ${pageInfo.route} - OVERALL: ❌ FAILED`);
+        console.log(`  💥 OVERALL: ❌ FAILED`);
       }
     }
 
