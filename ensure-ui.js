@@ -551,84 +551,6 @@ Return JSON array of individual expectations:`;
     }
   }
 
-  // Simplified report generation - focus on failures
-  generateReport() {
-    const { totalPages, passedPages, failedPages, pages } = this.results;
-
-    let report = `# 🤖 EnsureUI Test Results\n\n`;
-    report += `**Summary:** ${passedPages}/${totalPages} pages passed`;
-    
-    if (failedPages === 0) {
-      report += ` ✅\n\nAll tests passed! 🎉`;
-      return report;
-    }
-
-    report += `\n\n## ❌ Failed Pages (${failedPages})\n\n`;
-
-    const failedPages_list = pages.filter(p => !p.passed);
-    failedPages_list.forEach(page => {
-      const failedTests = page.generatedTests.filter(t => !t.passed);
-      
-      report += `### ${page.route}\n\n`;
-      
-      failedTests.forEach(test => {
-        report += `❌ **"${test.expectation}"**\n`;
-        if (test.error) {
-          report += `   Error: ${test.error}\n`;
-        }
-        report += `\n`;
-      });
-    });
-
-    // Add screenshot information
-    const hasScreenshots = pages.some(page => page.screenshot);
-    if (hasScreenshots) {
-      report += `\n## 📸 Screenshots\n\n`;
-      if (process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
-        const artifactUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
-        report += `Screenshots are available in [workflow artifacts](${artifactUrl})\n\n`;
-      } else {
-        report += `Screenshots saved to workflow artifacts\n\n`;
-      }
-    }
-
-    report += `\n_💡 Detailed logs available above for debugging_`;
-    return report;
-  }
-
-  async postResults(report) {
-    const promises = [];
-
-    if (this.githubToken && this.prNumber) {
-      promises.push(this.postGitHubComment(report));
-    }
-
-    console.log('\n' + report);
-    await Promise.allSettled(promises);
-  }
-
-  async postGitHubComment(report) {
-    try {
-      const response = await fetch(
-        `https://api.github.com/repos/${this.repository}/issues/${this.prNumber}/comments`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `token ${this.githubToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ body: report }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`GitHub API error: ${response.status}`);
-      }
-    } catch (error) {
-      console.error('Failed to post GitHub comment:', error);
-    }
-  }
-
   async run() {
     console.log('🤖 Starting EnsureUI tests with LLM...');
 
@@ -704,9 +626,6 @@ Return JSON array of individual expectations:`;
         console.log(`   View artifacts: ${artifactUrl}`);
       }
     }
-
-    const report = this.generateReport();
-    await this.postResults(report);
 
     // Output results using new GitHub Actions format
     if (process.env.GITHUB_OUTPUT) {
