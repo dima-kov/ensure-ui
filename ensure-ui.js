@@ -3,6 +3,89 @@ const path = require('path');
 const { chromium } = require('playwright');
 const { expect } = require('@playwright/test');
 
+// LLM Abstraction Layer
+class LLMProvider {
+  async generateText(prompt, systemPrompt, maxTokens = 500, temperature = 0.1) {
+    throw new Error('generateText method must be implemented by subclass');
+  }
+}
+
+class OpenAIProvider extends LLMProvider {
+  constructor(apiKey) {
+    super();
+    this.apiKey = apiKey;
+  }
+
+  async generateText(prompt, systemPrompt, maxTokens = 500, temperature = 0.1) {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_tokens: maxTokens,
+        temperature: temperature
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content.trim();
+  }
+}
+
+class AnthropicProvider extends LLMProvider {
+  constructor(apiKey) {
+    super();
+    this.apiKey = apiKey;
+  }
+
+  async generateText(prompt, systemPrompt, maxTokens = 500, temperature = 0.1) {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: maxTokens,
+        temperature: temperature,
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.content[0].text;
+  }
+}
+
 class EnsureUITester {
   constructor() {
     this.projectRoot = process.env.PROJECT_ROOT;
@@ -14,7 +97,23 @@ class EnsureUITester {
     this.ref = process.env.GITHUB_REF;
     this.sha = process.env.GITHUB_SHA;
     this.prNumber = process.env.PR_NUMBER;
-    this.openaiApiKey = process.env.OPENAI_API_KEY;
+    
+    // Initialize LLM provider based on environment variables
+    const llmProvider = process.env.OPENAI_API_KEY ? 'openai' : 'anthropic';
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+    
+    if (llmProvider === 'anthropic') {
+      if (!anthropicApiKey) {
+        throw new Error('ANTHROPIC_API_KEY environment variable is required when using Anthropic provider');
+      }
+      this.llm = new AnthropicProvider(anthropicApiKey);
+    } else {
+      if (!openaiApiKey) {
+        throw new Error('OPENAI_API_KEY environment variable is required when using OpenAI provider');
+      }
+      this.llm = new OpenAIProvider(openaiApiKey);
+    }
 
     this.results = {
       totalPages: 0,
@@ -291,10 +390,6 @@ Generate minimal Playwright test code:`;
 
   // Split a single comment into multiple testable expectations using LLM
   async splitExpectations(commentText) {
-    if (!this.openaiApiKey) {
-      throw new Error('OPENAI_API_KEY environment variable is required');
-    }
-
     const prompt = `You are a test expectation analyzer. Split the following UI testing expectation into individual, specific, testable assertions.
 
 RULES:
@@ -308,36 +403,10 @@ Comment: "${commentText}"
 
 Return JSON array of individual expectations:`;
 
+    const systemPrompt = 'You are a test expectation analyzer. Split UI testing expectations into individual testable assertions. Return only valid JSON array of strings.';
+
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            {
-              role: 'system', 
-              content: 'You are a test expectation analyzer. Split UI testing expectations into individual testable assertions. Return only valid JSON array of strings.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: 300,
-          temperature: 0.1
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const result = data.choices[0].message.content.trim();
+      const result = await this.llm.generateText(prompt, systemPrompt, 300, 0.1);
       
       // Clean and parse JSON
       const cleanResult = result.replace(/```json\n?/g, '').replace(/```/g, '').trim();
@@ -356,47 +425,15 @@ Return JSON array of individual expectations:`;
     }
   }
 
-  // Call OpenAI API to generate test code
+  // Generate test code using LLM
   async generateTestCode(html, expectation, currentUrl, redirectChain) {
-    if (!this.openaiApiKey) {
-      throw new Error('OPENAI_API_KEY environment variable is required');
-    }
-
     // const shrunkenHTML = this.shrinkHTML(html);
     const shrunkenHTML = '';
     const prompt = this.generateLLMPrompt(shrunkenHTML, expectation, currentUrl, redirectChain);
-
+    const systemPrompt = 'You are a Playwright testing expert. Generate only raw executable Playwright assertion code. No explanations, no markdown, no extra text. No require, import, or module syntax. Use await expect() for assertions.';
 
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o', // Cheaper model for this task
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a Playwright testing expert. Generate only raw executable Playwright assertion code. No explanations, no markdown, no extra text. No require, import, or module syntax. Use await expect() for assertions.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: 500,
-          temperature: 0.1
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const generatedCode = data.choices[0].message.content.trim();
+      const generatedCode = await this.llm.generateText(prompt, systemPrompt, 500, 0.1);
 
       // Clean up the generated code - remove markdown if present
       const cleanCode = generatedCode
@@ -406,7 +443,7 @@ Return JSON array of individual expectations:`;
 
       return cleanCode;
     } catch (error) {
-      console.error('OpenAI API call failed:', error);
+      console.error('LLM API call failed:', error);
       throw error;
     }
   }
@@ -562,8 +599,8 @@ Return JSON array of individual expectations:`;
   async run() {
     console.log('🤖 Starting EnsureUI tests with LLM...');
 
-    if (!this.openaiApiKey) {
-      console.error('OPENAI_API_KEY environment variable is required');
+    if (!this.llm) {
+      console.error('LLM provider not properly initialized');
       process.exit(1);
     }
 
