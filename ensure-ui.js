@@ -299,7 +299,7 @@ Return JSON array of individual expectations:`;
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4o',
           messages: [
             {
               role: 'system', 
@@ -357,7 +357,7 @@ Return JSON array of individual expectations:`;
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini', // Cheaper model for this task
+          model: 'gpt-4o', // Cheaper model for this task
           messages: [
             {
               role: 'system',
