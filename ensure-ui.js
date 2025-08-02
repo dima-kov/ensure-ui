@@ -236,6 +236,12 @@ class EnsureUITester {
   generateLLMPrompt(html, expectation) {
     return `You are a Playwright testing expert. Generate ONLY the test code to verify the expectation.
 
+IMPORTANT CONTEXT:
+- The page is already loaded and available as 'page'
+- Test the CURRENT page content and behavior
+- Do NOT navigate to other URLs unless the expectation specifically requires it
+- The HTML provided is from the current page being tested
+
 RULES:
 - Output ONLY raw Playwright code, no explanations, no markdown
 - Use await expect() for assertions
@@ -438,11 +444,11 @@ Return JSON array of individual expectations:`;
             error: testPassed ? null : 'Assertion failed'
           });
 
+          console.log(`       Generated code: ${testCode}`);
           if (testPassed) {
             console.log(`       ✅ PASSED`);
           } else {
             console.log(`       ❌ FAILED - Assertion failed`);
-            console.log(`       Generated: ${testCode}`);
           }
 
         } catch (error) {
