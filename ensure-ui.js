@@ -362,7 +362,8 @@ Return JSON array of individual expectations:`;
       throw new Error('OPENAI_API_KEY environment variable is required');
     }
 
-    const shrunkenHTML = this.shrinkHTML(html);
+    // const shrunkenHTML = this.shrinkHTML(html);
+    const shrunkenHTML = '';
     const prompt = this.generateLLMPrompt(shrunkenHTML, expectation, currentUrl, redirectChain);
 
 
