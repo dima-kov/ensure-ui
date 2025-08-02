@@ -240,36 +240,55 @@ class EnsureUITester {
 
     return `You are a Playwright testing expert. Generate ONLY the test code to verify the expectation.
 
-IMPORTANT CONTEXT:
-- The page is already loaded and available as 'page'
-- Current URL being tested: ${currentUrl}
-- Test the CURRENT page content and behavior
-- Do NOT navigate to other URLs unless the expectation specifically requires it
-- The HTML provided is from the current page being tested
-- For redirect tests: test if the CURRENT page redirects when accessed, not navigation to other pages${redirectInfo}
+CRITICAL: First categorize the expectation, then generate appropriate code:
 
-RULES:
-- Output ONLY raw Playwright code, no explanations, no markdown
-- Use await expect() for assertions
-- Use page.click(), page.fill(), page.selectOption() for interactions when needed
-- Use simple, robust selectors (prefer text content, roles, or data-testid)
-- For static content: verify text presence, element existence, attributes
-- For interactions: perform actions then verify results
-- Handle both single assertions and multi-step flows
-- Be defensive with selectors (use page.locator() with good fallbacks)
-- For redirect testing: use the redirectChain variable to find and verify redirect responses
+EXPECTATION CATEGORIES & CODE TEMPLATES:
 
-REDIRECT TESTING EXAMPLES:
+1. PAGE_LOAD (keywords: "loaded successfully", "responds", "accessible", "works", "loads")
+   Template: await expect(page).toHaveURL('${currentUrl}');
+   - ONLY check URL or basic page state
+   - DO NOT check specific content unless explicitly mentioned
+
+2. CONTENT_PRESENCE (keywords: "contains", "shows", "displays", "has", "visible")
+   Template: await expect(page.getByText('expected text')).toBeVisible();
+   - Check for specific text, elements, or attributes mentioned
+   - Use precise selectors based on mentioned content
+
+3. INTERACTION (keywords: "click", "submit", "fill", "navigate", "select")
+   Template: await page.click('selector'); await expect(result).toBeTruthy();
+   - Perform the action then verify the result
+   - Test the specific interaction mentioned
+
+4. REDIRECT (keywords: "redirect", "301", "302", "location")${redirectInfo}
+   Template: const redirect = redirectChain.find(r => r.status === 301); await expect(redirect).toBeDefined();
+   - Use redirectChain to verify redirect behavior
+
+5. VISUAL (keywords: "layout", "responsive", "styling", "appearance")
+   Template: await expect(page.locator('selector')).toHaveCSS('property', 'value');
+   - Check visual properties and styling
+
+6. REDIRECT TESTING EXAMPLES:
 - To check for 301 redirect: const redirect = redirectChain.find(r => r.status === 301); expect(redirect).toBeDefined();
 - To check redirect target: expect(redirect.location).toContain('/target-path');
 - To check final URL: expect(page.url()).toContain('/final-path');
+
+RULES:
+- Match expectation to ONE category above
+- Use ONLY the code template for that category
+- Be MINIMAL - don't add extra assertions
+- Output ONLY raw Playwright code, no explanations
+
+CURRENT CONTEXT:
+- Page already loaded at: ${currentUrl}
+- HTML provided below for reference only
 
 HTML:
 ${html}
 
 User Expectation: "${expectation}"
 
-Generate the Playwright test code:`;
+Category: [Determine from keywords above]
+Generate minimal Playwright test code:`;
   }
 
   // Split a single comment into multiple testable expectations using LLM
