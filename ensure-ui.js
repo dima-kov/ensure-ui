@@ -233,7 +233,11 @@ class EnsureUITester {
   }
 
   // Generate LLM prompt for test generation
-  generateLLMPrompt(html, expectation, currentUrl) {
+  generateLLMPrompt(html, expectation, currentUrl, redirectChain) {
+    const redirectInfo = redirectChain && redirectChain.length > 0 
+      ? `\n- REDIRECT CHAIN AVAILABLE: A 'redirectChain' variable contains all HTTP responses with redirect info\n- redirectChain format: [{url, status, location}, ...] where location is the redirect target\n- Use redirectChain to test redirect status codes and targets`
+      : '';
+
     return `You are a Playwright testing expert. Generate ONLY the test code to verify the expectation.
 
 IMPORTANT CONTEXT:
@@ -242,7 +246,7 @@ IMPORTANT CONTEXT:
 - Test the CURRENT page content and behavior
 - Do NOT navigate to other URLs unless the expectation specifically requires it
 - The HTML provided is from the current page being tested
-- For redirect tests: test if the CURRENT page redirects when accessed, not navigation to other pages
+- For redirect tests: test if the CURRENT page redirects when accessed, not navigation to other pages${redirectInfo}
 
 RULES:
 - Output ONLY raw Playwright code, no explanations, no markdown
@@ -253,6 +257,12 @@ RULES:
 - For interactions: perform actions then verify results
 - Handle both single assertions and multi-step flows
 - Be defensive with selectors (use page.locator() with good fallbacks)
+- For redirect testing: use the redirectChain variable to find and verify redirect responses
+
+REDIRECT TESTING EXAMPLES:
+- To check for 301 redirect: const redirect = redirectChain.find(r => r.status === 301); expect(redirect).toBeDefined();
+- To check redirect target: expect(redirect.location).toContain('/target-path');
+- To check final URL: expect(page.url()).toContain('/final-path');
 
 HTML:
 ${html}
@@ -330,13 +340,13 @@ Return JSON array of individual expectations:`;
   }
 
   // Call OpenAI API to generate test code
-  async generateTestCode(html, expectation, currentUrl) {
+  async generateTestCode(html, expectation, currentUrl, redirectChain) {
     if (!this.openaiApiKey) {
       throw new Error('OPENAI_API_KEY environment variable is required');
     }
 
     const shrunkenHTML = this.shrinkHTML(html);
-    const prompt = this.generateLLMPrompt(shrunkenHTML, expectation, currentUrl);
+    const prompt = this.generateLLMPrompt(shrunkenHTML, expectation, currentUrl, redirectChain);
 
 
     try {
@@ -403,12 +413,24 @@ Return JSON array of individual expectations:`;
       error: null
     };
 
+    // Track redirects
+    const redirectChain = [];
+
     try {
       // Capture console errors
       page.on('console', msg => {
         if (msg.type() === 'error') {
           testResult.consoleErrors.push(msg.text());
         }
+      });
+
+      // Capture all responses to track redirects
+      page.on('response', response => {
+        redirectChain.push({
+          url: response.url(),
+          status: response.status(),
+          location: response.headers()['location'] || null
+        });
       });
 
       // Navigate to page
@@ -435,8 +457,8 @@ Return JSON array of individual expectations:`;
         console.log(`\n    ${testNum}. Testing: "${expectation.text}"`);
 
         try {
-          const testCode = await this.generateTestCode(htmlContent, expectation.text, pageInfo.url);
-          const testPassed = await this.executeGeneratedTest(page, testCode);
+          const testCode = await this.generateTestCode(htmlContent, expectation.text, pageInfo.url, redirectChain);
+          const testPassed = await this.executeGeneratedTest(page, testCode, redirectChain);
 
           testResult.generatedTests.push({
             expectation: expectation.text,
@@ -485,16 +507,16 @@ Return JSON array of individual expectations:`;
   }
 
   // Execute the LLM-generated test code safely
-  async executeGeneratedTest(page, testCode) {
+  async executeGeneratedTest(page, testCode, redirectChain) {
     try {
       // Create a safe execution context
-      const testFunction = new Function('page', 'expect', `
+      const testFunction = new Function('page', 'expect', 'redirectChain', `
         return (async () => {
           ${testCode}
           return true;
         })();
       `);
-      await testFunction(page, expect);
+      await testFunction(page, expect, redirectChain);
       return true;
     } catch (error) {
       console.error(`Generated test execution failed: ${error.message}`);
