@@ -49,31 +49,28 @@ node ensure-ui.js
 - `GITHUB_TOKEN` - For posting PR comments
 - `TIMEOUT` - Page load timeout (default: 15 seconds)
 
-## Comment Formats
+## Current Testing Scope
 
-### Single-line Static Tests
+### Static Testing Only
+The `isValidExpectation()` function (ensure-ui.js:98) currently **restricts testing to static content only**:
+- Text presence and content verification
+- Element existence and structure validation
+- Basic page health checks
+
+### Blocked Capabilities
+Interactive testing patterns are currently disabled:
+- Click, navigate, submit, fill operations
+- Form validation and redirects
+- Multi-step user flows
+- Hover interactions and API calls
+
+## Comment Format
+
+Currently supports only single-line expectations:
 ```javascript
 // ensureUI: the page shows a welcome message
 // ensureUI: there should be a navigation menu
 ```
-
-### Multi-line Static Tests
-```javascript
-// ensureUI
-// the page should display a navigation menu with home, about, and contact links
-// the footer should contain copyright information and social media links
-```
-
-### Multi-line Flow Tests (Interactive)
-```javascript
-// ensureUI
-// user should be able to click the "Get Started" button
-// then user should see a signup form with name, email, and password fields
-// user should be able to fill out the form and submit it
-// after submission, user should see a success message
-```
-
-The system automatically detects flow vs static tests based on keywords like 'click', 'fill', 'submit', 'navigate', 'user', etc.
 
 ## HTML Processing
 
@@ -92,33 +89,19 @@ The `shrinkHTML()` function (ensure-ui.js:161) reduces HTML size for LLM process
 5. Execute safely using Function constructor
 6. Report results with screenshots
 
-## Flow Definition Files (ensure.md)
+## Architecture Limitations
 
-Create `ensure.md` files to define complex user flows:
+### Current Implementation vs Documentation Gap
+- README describes comprehensive interactive testing capabilities
+- Implementation actively restricts interactive patterns via validation
+- Multi-line comment support mentioned in README but not implemented
+- Flow definition files (ensure.md) described but not implemented
 
-```markdown
-# User Login Flow
-
-> Test the complete user authentication flow
-
-@username = testuser@example.com
-@password = password123
-
-1. Navigate to /login page
-2. User should see login form with email and password fields
-3. Fill in email field with @username
-4. Fill in password field with @password
-5. Click the login button
-6. User should be redirected to /dashboard
-7. User should see welcome message
-```
-
-### Flow File Features:
-- **Variables**: `@variable = value` syntax for reusable values
-- **Steps**: Numbered steps with natural language descriptions
-- **Navigation**: Automatic URL detection and navigation
-- **State Management**: Maintains cookies and localStorage between steps
-- **Screenshots**: Captures screenshots after each step
+### Monolithic Structure
+- Single 523-line file contains all logic
+- No modular separation of concerns
+- No package.json or development dependencies
+- No test suite for the testing tool itself
 
 ## File Structure Patterns
 
@@ -126,38 +109,10 @@ The action expects Next.js project structures:
 - Pages Router: `pages/*.{js,jsx,ts,tsx}`
 - App Router: `app/**/page.{js,jsx,ts,tsx}`
 - Supports src/ prefix for both patterns
-- Flow files: `ensure.md`, `tests/ensure.md`, `**/ensure.md`
 
-## Testing Capabilities
+## LLM Integration
 
-### Static Tests (Content-focused)
-- Text presence and content verification
-- Element existence and structure
-- Visual layout validation
-- Accessibility checks
-
-### Flow Tests (Interactive)
-- Form filling and submission
-- Button clicks and navigation
-- Modal interactions
-- Multi-step user journeys
-- Authentication flows
-- Shopping cart operations
-- Complex UI interactions
-
-## New Architecture Features
-
-### Multi-line Comment Parsing
-- `extractMultiLineExpectation()` - Processes multi-line comment blocks
-- `isFlowKeyword()` - Detects interactive vs static tests
-- Automatic type detection based on content
-
-### Flow Execution Engine
-- `parseFlowFile()` - Parses ensure.md files into executable flows
-- `runFlowTest()` - Executes complete user flows step-by-step
-- `flowState` - Maintains state between flow steps (cookies, localStorage)
-
-### Enhanced LLM Integration
-- Different prompts for static vs flow tests
-- Increased token limits for complex interactions
-- Context-aware test generation based on HTML structure
+- Uses OpenAI `gpt-4o-mini` model for cost efficiency
+- Token-optimized HTML processing
+- Structured prompts for Playwright code generation
+- Safe execution environment for generated code
