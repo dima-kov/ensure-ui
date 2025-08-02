@@ -250,7 +250,7 @@ Generate the Playwright test code:`;
           messages: [
             {
               role: 'system',
-              content: 'You are a Playwright testing expert. Generate only raw executable Playwright assertion code. No explanations, no markdown, no extra text.'
+              content: 'You are a Playwright testing expert. Generate only raw executable Playwright assertion code. No explanations, no markdown, no extra text. No require, import, or module syntax. Use await expect() for assertions.'
             },
             {
               role: 'user',
