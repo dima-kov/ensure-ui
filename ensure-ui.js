@@ -99,7 +99,8 @@ class EnsureUITester {
     this.prNumber = process.env.PR_NUMBER;
     
     // Initialize LLM provider based on environment variables
-    const llmProvider = process.env.OPENAI_API_KEY ? 'openai' : 'anthropic';
+    // const llmProvider = process.env.OPENAI_API_KEY ? 'openai' : 'anthropic';
+    const llmProvider = 'anthropic';
     const openaiApiKey = process.env.OPENAI_API_KEY;
     const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
     
