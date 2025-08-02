@@ -507,7 +507,15 @@ Return JSON array of individual expectations:`;
       }
 
       // Take screenshot
-      const screenshotPath = `screenshots/${pageInfo.route.replace(/\//g, '_')}.png`;
+      const screenshotDir = process.env.GITHUB_WORKSPACE ? `${process.env.GITHUB_WORKSPACE}/screenshots` : 'screenshots';
+      const screenshotFilename = `${pageInfo.route.replace(/\//g, '_')}.png`;
+      const screenshotPath = `${screenshotDir}/${screenshotFilename}`;
+      
+      // Ensure directory exists
+      if (!fs.existsSync(screenshotDir)) {
+        fs.mkdirSync(screenshotDir, { recursive: true });
+      }
+      
       await page.screenshot({ path: screenshotPath, fullPage: true });
       testResult.screenshot = screenshotPath;
 
@@ -571,6 +579,18 @@ Return JSON array of individual expectations:`;
         report += `\n`;
       });
     });
+
+    // Add screenshot information
+    const hasScreenshots = pages.some(page => page.screenshot);
+    if (hasScreenshots) {
+      report += `\n## 📸 Screenshots\n\n`;
+      if (process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
+        const artifactUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+        report += `Screenshots are available in [workflow artifacts](${artifactUrl})\n\n`;
+      } else {
+        report += `Screenshots saved to workflow artifacts\n\n`;
+      }
+    }
 
     report += `\n_💡 Detailed logs available above for debugging_`;
     return report;
@@ -676,10 +696,24 @@ Return JSON array of individual expectations:`;
     }
     console.log('='.repeat(80));
 
+    // Add screenshot artifact information
+    if (this.results.pages.some(page => page.screenshot)) {
+      console.log(`\n📸 Screenshots saved to workflow artifacts`);
+      if (process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
+        const artifactUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+        console.log(`   View artifacts: ${artifactUrl}`);
+      }
+    }
+
     const report = this.generateReport();
     await this.postResults(report);
 
-    console.log(`::set-output name=results::${JSON.stringify(this.results)}`);
+    // Output results using new GitHub Actions format
+    if (process.env.GITHUB_OUTPUT) {
+      fs.appendFileSync(process.env.GITHUB_OUTPUT, `results=${JSON.stringify(this.results)}\n`);
+    } else {
+      console.log(`::set-output name=results::${JSON.stringify(this.results)}`);
+    }
 
     if (this.results.failedPages > 0) {
       process.exit(1);
