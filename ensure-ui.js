@@ -592,20 +592,24 @@ Return JSON array of individual expectations:`;
     // Add screenshot information
     const screenshotPages = pages.filter(page => page.screenshot);
     if (screenshotPages.length > 0) {
-      report += `\n## 📸 Screenshots\n\n`;
+      report += `\n## 📸 Individual Screenshot Artifacts\n\n`;
       
       if (process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
         const runUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
-        report += `Screenshots captured for ${screenshotPages.length} page(s). [View all artifacts](${runUrl})\n\n`;
+        report += `Each page has its own downloadable screenshot artifact. [View artifacts](${runUrl})\n\n`;
+        
+        report += `| Page | Artifact Name | Download |\n`;
+        report += `|------|---------------|----------|\n`;
         
         screenshotPages.forEach(page => {
           const artifactName = `screenshot-${page.route.replace(/\//g, '-').replace(/^-/, '')}`;
-          report += `- **${page.route}**: Look for artifact "${artifactName}"\n`;
+          report += `| **${page.route}** | \`${artifactName}\` | [⬇️ Download](${runUrl}) |\n`;
         });
+        
+        report += `\n💡 **How to download**: Click the link above → Scroll to "Artifacts" section → Click on the specific artifact name\n\n`;
       } else {
         report += `Screenshots saved for ${screenshotPages.length} page(s)\n`;
       }
-      report += `\n`;
     }
 
     report += `\n_💡 Detailed logs available above for debugging_`;
@@ -630,24 +634,26 @@ Return JSON array of individual expectations:`;
       return;
     }
 
-    console.log(`\n📸 Screenshots captured for ${screenshotPages.length} page(s):`);
+    console.log(`\n📸 Individual screenshot artifacts created:`);
     
     for (const page of screenshotPages) {
+      const artifactName = `screenshot-${page.route.replace(/\//g, '-').replace(/^-/, '')}`;
+      
       if (process.env.GITHUB_ACTIONS) {
-        // Create individual artifact using GitHub Actions commands
-        const artifactName = `screenshot-${page.route.replace(/\//g, '-').replace(/^-/, '')}`;
-        const filename = page.screenshot;
+        console.log(`   📦 ${page.route}`);
+        console.log(`      Artifact: ${artifactName}`);
         
-        console.log(`   📁 ${page.route}: ${artifactName}`);
-        
-        // Use GitHub Actions artifact upload command
-        console.log(`##[command]mkdir -p artifacts/${artifactName}`);
-        console.log(`##[command]cp ${filename} artifacts/${artifactName}/`);
-        
-        // For now, just log the artifact info - the action.yml will handle upload
         if (process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
-          const artifactUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
-          console.log(`      🔗 Download: ${artifactUrl} (look for "${artifactName}")`);
+          // Generate individual artifact download URL
+          // GitHub provides direct artifact download links in the format:
+          // https://github.com/OWNER/REPO/suites/SUITE_ID/artifacts/ARTIFACT_ID
+          // But since we don't have artifact ID yet, we'll use the run URL
+          const runUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+          console.log(`      🔗 Download: ${runUrl} → "${artifactName}"`);
+          
+          // Store artifact URL for reporting
+          page.individualArtifactUrl = `${runUrl}#artifact-${artifactName}`;
+          page.artifactName = artifactName;
         }
       } else {
         console.log(`   📄 ${page.route}: ${page.screenshot}`);
@@ -656,7 +662,8 @@ Return JSON array of individual expectations:`;
     
     if (process.env.GITHUB_ACTIONS && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
       const runUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
-      console.log(`\n   🌐 All artifacts: ${runUrl}`);
+      console.log(`\n   🌐 View all artifacts: ${runUrl}`);
+      console.log(`   💡 Each screenshot is now a separate downloadable artifact!`);
     }
   }
 
