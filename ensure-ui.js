@@ -561,8 +561,7 @@ Return JSON array of individual expectations:`;
     failedPages_list.forEach(page => {
       const failedTests = page.generatedTests.filter(t => !t.passed);
       
-      report += `### ${page.route}\n`;
-      report += `**Failed tests:** ${failedTests.length}/${page.generatedTests.length}\n\n`;
+      report += `### ${page.route}\n\n`;
       
       failedTests.forEach(test => {
         report += `❌ **"${test.expectation}"**\n`;
