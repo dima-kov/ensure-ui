@@ -259,18 +259,16 @@ EXPECTATION CATEGORIES & CODE TEMPLATES:
    - Perform the action then verify the result
    - Test the specific interaction mentioned
 
-4. REDIRECT (keywords: "redirect", "301", "302", "location")${redirectInfo}
-   Template: const redirect = redirectChain.find(r => r.status === 301); await expect(redirect).toBeDefined();
-   - Use redirectChain to verify redirect behavior
+4. REDIRECT (keywords: "redirect", "301", "302", other status codes)${redirectInfo}
+   Template options:
+   - For specific status code (e.g. "should redirect with 301"): const redirect = redirectChain.find(r => r.status === 301); await expect(redirect).toBeDefined();
+   - For any redirect (e.g. "should redirect"): await expect(redirectChain.length).toBeGreaterThan(1);
+   - For redirect to specific page (e.g. "should redirect to /login"): const redirect = redirectChain.find(r => r.location && r.location.includes('/login')); await expect(redirect).toBeDefined();
+   - Use redirectChain to verify redirect behavior based on what user specified
 
 5. VISUAL (keywords: "layout", "responsive", "styling", "appearance")
    Template: await expect(page.locator('selector')).toHaveCSS('property', 'value');
    - Check visual properties and styling
-
-6. REDIRECT TESTING EXAMPLES:
-- To check for 301 redirect: const redirect = redirectChain.find(r => r.status === 301); expect(redirect).toBeDefined();
-- To check redirect target: expect(redirect.location).toContain('/target-path');
-- To check final URL: expect(page.url()).toContain('/final-path');
 
 RULES:
 - Match expectation to ONE category above
@@ -547,6 +545,15 @@ Return JSON array of individual expectations:`;
       return true;
     } catch (error) {
       console.error(`Generated test execution failed: ${error.message}`);
+      
+      // If this looks like a redirect test failure, show the redirect chain for debugging
+      if (testCode.includes('redirectChain') && redirectChain && redirectChain.length > 0) {
+        console.error(`       Redirect chain details:`);
+        redirectChain.forEach((redirect, index) => {
+          console.error(`       ${index + 1}. ${redirect.url} -> Status: ${redirect.status}${redirect.location ? ` -> Location: ${redirect.location}` : ''}`);
+        });
+      }
+      
       return false;
     }
   }
