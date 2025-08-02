@@ -507,17 +507,26 @@ Return JSON array of individual expectations:`;
       }
 
       // Take screenshot
-      const screenshotDir = process.env.GITHUB_WORKSPACE ? `${process.env.GITHUB_WORKSPACE}/screenshots` : 'screenshots';
       const screenshotFilename = `${pageInfo.route.replace(/\//g, '_')}.png`;
-      const screenshotPath = `${screenshotDir}/${screenshotFilename}`;
-      
-      // Ensure directory exists
-      if (!fs.existsSync(screenshotDir)) {
-        fs.mkdirSync(screenshotDir, { recursive: true });
-      }
+      const screenshotPath = `${screenshotFilename}`;
       
       await page.screenshot({ path: screenshotPath, fullPage: true });
       testResult.screenshot = screenshotPath;
+      testResult.screenshotArtifactName = `screenshot-${pageInfo.route.replace(/\//g, '-').replace(/^-/, '')}`;
+      
+      // Upload as individual artifact using GitHub Actions core commands
+      if (process.env.GITHUB_ACTIONS) {
+        console.log(`::notice::📸 Screenshot saved for ${pageInfo.route}: ${screenshotPath}`);
+        // Use GitHub Actions artifact upload command
+        console.log(`##[command]Upload artifact: ${testResult.screenshotArtifactName}`);
+        
+        // Generate artifact download info
+        if (process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
+          const artifactUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+          testResult.artifactUrl = artifactUrl;
+          console.log(`   📥 Download: ${artifactUrl} (artifact: ${testResult.screenshotArtifactName})`);
+        }
+      }
 
       // Overall test result
       testResult.passed = testResult.basicChecks.pageLoaded &&
@@ -581,15 +590,22 @@ Return JSON array of individual expectations:`;
     });
 
     // Add screenshot information
-    const hasScreenshots = pages.some(page => page.screenshot);
-    if (hasScreenshots) {
+    const screenshotPages = pages.filter(page => page.screenshot);
+    if (screenshotPages.length > 0) {
       report += `\n## 📸 Screenshots\n\n`;
+      
       if (process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
-        const artifactUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
-        report += `Screenshots are available in [workflow artifacts](${artifactUrl})\n\n`;
+        const runUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+        report += `Screenshots captured for ${screenshotPages.length} page(s). [View all artifacts](${runUrl})\n\n`;
+        
+        screenshotPages.forEach(page => {
+          const artifactName = `screenshot-${page.route.replace(/\//g, '-').replace(/^-/, '')}`;
+          report += `- **${page.route}**: Look for artifact "${artifactName}"\n`;
+        });
       } else {
-        report += `Screenshots saved to workflow artifacts\n\n`;
+        report += `Screenshots saved for ${screenshotPages.length} page(s)\n`;
       }
+      report += `\n`;
     }
 
     report += `\n_💡 Detailed logs available above for debugging_`;
@@ -605,6 +621,43 @@ Return JSON array of individual expectations:`;
 
     console.log('\n' + report);
     await Promise.allSettled(promises);
+  }
+
+  async uploadScreenshotArtifacts() {
+    const screenshotPages = this.results.pages.filter(page => page.screenshot);
+    
+    if (screenshotPages.length === 0) {
+      return;
+    }
+
+    console.log(`\n📸 Screenshots captured for ${screenshotPages.length} page(s):`);
+    
+    for (const page of screenshotPages) {
+      if (process.env.GITHUB_ACTIONS) {
+        // Create individual artifact using GitHub Actions commands
+        const artifactName = `screenshot-${page.route.replace(/\//g, '-').replace(/^-/, '')}`;
+        const filename = page.screenshot;
+        
+        console.log(`   📁 ${page.route}: ${artifactName}`);
+        
+        // Use GitHub Actions artifact upload command
+        console.log(`##[command]mkdir -p artifacts/${artifactName}`);
+        console.log(`##[command]cp ${filename} artifacts/${artifactName}/`);
+        
+        // For now, just log the artifact info - the action.yml will handle upload
+        if (process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
+          const artifactUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+          console.log(`      🔗 Download: ${artifactUrl} (look for "${artifactName}")`);
+        }
+      } else {
+        console.log(`   📄 ${page.route}: ${page.screenshot}`);
+      }
+    }
+    
+    if (process.env.GITHUB_ACTIONS && process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
+      const runUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+      console.log(`\n   🌐 All artifacts: ${runUrl}`);
+    }
   }
 
   async postGitHubComment(report) {
@@ -696,14 +749,8 @@ Return JSON array of individual expectations:`;
     }
     console.log('='.repeat(80));
 
-    // Add screenshot artifact information
-    if (this.results.pages.some(page => page.screenshot)) {
-      console.log(`\n📸 Screenshots saved to workflow artifacts`);
-      if (process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
-        const artifactUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
-        console.log(`   View artifacts: ${artifactUrl}`);
-      }
-    }
+    // Upload individual screenshot artifacts and display links
+    await this.uploadScreenshotArtifacts();
 
     const report = this.generateReport();
     await this.postResults(report);

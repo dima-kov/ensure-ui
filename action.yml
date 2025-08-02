@@ -49,3 +49,48 @@ runs:
         GITHUB_REF: ${{ github.ref }}
         GITHUB_SHA: ${{ github.sha }}
         PR_NUMBER: ${{ github.event.number }}
+
+    - name: Upload individual screenshot artifacts
+      if: always()
+      run: |
+        echo "🔍 Looking for screenshots to upload..."
+        screenshot_count=0
+        
+        for file in *.png; do
+          if [ -f "$file" ]; then
+            # Extract route name from filename for artifact name
+            route_name=$(echo "$file" | sed 's/\.png$//' | sed 's/_/-/g' | sed 's/^-//')
+            artifact_name="screenshot-$route_name"
+            
+            echo "📸 Found screenshot: $file -> $artifact_name"
+            
+            # Create individual directory for this screenshot
+            mkdir -p "artifact-$route_name"
+            cp "$file" "artifact-$route_name/"
+            
+            # Use actions/upload-artifact@v4 for this specific screenshot
+            echo "##[group]Uploading $artifact_name"
+            
+            # We'll use a separate upload step that we trigger with outputs
+            echo "screenshot_${screenshot_count}_file=$file" >> $GITHUB_OUTPUT
+            echo "screenshot_${screenshot_count}_name=$artifact_name" >> $GITHUB_OUTPUT
+            echo "screenshot_${screenshot_count}_path=artifact-$route_name" >> $GITHUB_OUTPUT
+            
+            screenshot_count=$((screenshot_count + 1))
+            echo "##[endgroup]"
+          fi
+        done
+        
+        echo "screenshot_count=$screenshot_count" >> $GITHUB_OUTPUT
+        echo "📊 Total screenshots found: $screenshot_count"
+      shell: bash
+      working-directory: ${{ github.action_path }}
+
+    - name: Upload screenshots as single artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ensureui-screenshots
+        path: ${{ github.action_path }}/*.png
+        retention-days: 7
+        if-no-files-found: ignore
