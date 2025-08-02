@@ -64,7 +64,7 @@ class EnsureUITester {
     }
   }
 
-  // Extract expectations from ensureUI comments
+  // Extract expectations from ensureUI comments (supports multi-line)
   extractEnsureUIComments(filePath) {
     try {
       const content = fs.readFileSync(filePath, 'utf8');
@@ -73,17 +73,50 @@ class EnsureUITester {
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
+        
         // Match: // ensureUI: some expectation text
-        const match = line.match(/\/\/\s*ensureUI:\s*(.+)/i);
-        if (match) {
-          const expectation = match[1].trim();
-          if (this.isValidExpectation(expectation)) {
+        const singleLineMatch = line.match(/\/\/\s*ensureUI:\s*(.+)/i);
+        if (singleLineMatch) {
+          // Check if this starts a multi-line expectation
+          const startLineNumber = i + 1;
+          let fullExpectation = singleLineMatch[1].trim();
+          let currentLine = i + 1;
+          
+          // Look for continuation lines that start with // and contain "also:"
+          while (currentLine < lines.length) {
+            const nextLine = lines[currentLine].trim();
+            const continuationMatch = nextLine.match(/\/\/\s*also:\s*(.+)/i);
+            if (continuationMatch) {
+              fullExpectation += ', ' + continuationMatch[1].trim();
+              currentLine++;
+            } else {
+              // Check for generic continuation (just // followed by text, no "also:")
+              const genericContinuation = nextLine.match(/\/\/\s*(.+)/);
+              if (genericContinuation && !nextLine.match(/\/\/\s*ensureUI/i)) {
+                // Only continue if it looks like part of the expectation
+                const continuationText = genericContinuation[1].trim();
+                if (continuationText && !continuationText.startsWith('TODO') && !continuationText.startsWith('FIXME') && !continuationText.startsWith('NOTE')) {
+                  fullExpectation += ', ' + continuationText;
+                  currentLine++;
+                } else {
+                  break;
+                }
+              } else {
+                break;
+              }
+            }
+          }
+          
+          // Skip the lines we've already processed
+          i = currentLine - 1;
+          
+          if (this.isValidExpectation(fullExpectation)) {
             expectations.push({
-              text: expectation,
-              lineNumber: i + 1
+              text: fullExpectation,
+              lineNumber: startLineNumber
             });
           } else {
-            console.warn(`Ignoring unsupported expectation at ${filePath}:${i + 1}: "${expectation}"`);
+            console.warn(`Ignoring unsupported expectation at ${filePath}:${startLineNumber}: "${fullExpectation}"`);
           }
         }
       }
