@@ -327,14 +327,16 @@ Generate the Playwright test code:`;
       const htmlContent = await page.content();
 
       // Generate and run tests for each expectation
-      for (const expectation of pageInfo.expectations) {
-        console.log(`  Generating test for: "${expectation.text}"`);
+      console.log(`\n  📝 Testing ${pageInfo.expectations.length} expectation(s):`);
+      
+      for (let i = 0; i < pageInfo.expectations.length; i++) {
+        const expectation = pageInfo.expectations[i];
+        const testNum = i + 1;
+        
+        console.log(`\n    ${testNum}. Testing: "${expectation.text}"`);
 
         try {
           const testCode = await this.generateTestCode(htmlContent, expectation.text);
-          console.log(`  Generated code: ${testCode}`);
-
-          // Execute the generated test code
           const testPassed = await this.executeGeneratedTest(page, testCode);
 
           testResult.generatedTests.push({
@@ -345,8 +347,15 @@ Generate the Playwright test code:`;
             error: testPassed ? null : 'Assertion failed'
           });
 
+          if (testPassed) {
+            console.log(`       ✅ PASSED`);
+          } else {
+            console.log(`       ❌ FAILED - Assertion failed`);
+            console.log(`       Generated: ${testCode}`);
+          }
+
         } catch (error) {
-          console.error(`  Failed to generate/run test for "${expectation.text}":`, error);
+          console.log(`       ❌ FAILED - ${error.message}`);
           testResult.generatedTests.push({
             expectation: expectation.text,
             lineNumber: expectation.lineNumber,
@@ -394,59 +403,37 @@ Generate the Playwright test code:`;
     }
   }
 
-  // Enhanced report generation
+  // Simplified report generation - focus on failures
   generateReport() {
     const { totalPages, passedPages, failedPages, pages } = this.results;
 
-    let report = `# 🤖 EnsureUI Test Results (LLM-Powered)\n\n`;
-    report += `**Summary:** ${passedPages}/${totalPages} pages passed\n\n`;
-
-    if (failedPages > 0) {
-      report += `## ❌ Failed Pages (${failedPages})\n\n`;
-
-      pages.filter(p => !p.passed).forEach(page => {
-        report += `### ${page.route}\n`;
-        report += `- **URL:** ${page.url}\n`;
-
-        // Basic checks
-        if (!page.basicChecks.pageLoaded) {
-          report += `- **Page Load:** ❌ Failed to load\n`;
-        }
-
-        // Generated tests
-        page.generatedTests.forEach(test => {
-          const icon = test.passed ? '✅' : '❌';
-          report += `- **"${test.expectation}":** ${icon}\n`;
-          if (!test.passed && test.error) {
-            report += `  - Error: ${test.error}\n`;
-          }
-          if (test.generatedCode) {
-            report += `  - Generated: \`${test.generatedCode}\`\n`;
-          }
-        });
-
-        if (page.consoleErrors.length > 0) {
-          report += `- **Console Errors:**\n`;
-          page.consoleErrors.slice(0, 3).forEach(error => {
-            report += `  - ${error}\n`;
-          });
-        }
-
-        report += '\n';
-      });
+    let report = `# 🤖 EnsureUI Test Results\n\n`;
+    report += `**Summary:** ${passedPages}/${totalPages} pages passed`;
+    
+    if (failedPages === 0) {
+      report += ` ✅\n\nAll tests passed! 🎉`;
+      return report;
     }
 
-    if (passedPages > 0) {
-      report += `## ✅ Passed Pages (${passedPages})\n\n`;
+    report += `\n\n## ❌ Failed Pages (${failedPages})\n\n`;
 
-      pages.filter(p => p.passed).forEach(page => {
-        report += `- **${page.route}** - ${page.generatedTests.length} expectations passed ✅\n`;
-        page.generatedTests.forEach(test => {
-          report += `  - "${test.expectation}"\n`;
-        });
+    const failedPages_list = pages.filter(p => !p.passed);
+    failedPages_list.forEach(page => {
+      const failedTests = page.generatedTests.filter(t => !t.passed);
+      
+      report += `### ${page.route}\n`;
+      report += `**Failed tests:** ${failedTests.length}/${page.generatedTests.length}\n\n`;
+      
+      failedTests.forEach(test => {
+        report += `❌ **"${test.expectation}"**\n`;
+        if (test.error) {
+          report += `   Error: ${test.error}\n`;
+        }
+        report += `\n`;
       });
-    }
+    });
 
+    report += `\n_💡 Detailed logs available above for debugging_`;
     return report;
   }
 
@@ -503,19 +490,45 @@ Generate the Playwright test code:`;
 
     this.results.totalPages = pages.length;
 
-    for (const pageInfo of pages) {
-      console.log(`Testing: ${pageInfo.url} (${pageInfo.expectations.length} expectations)`);
+    for (let i = 0; i < pages.length; i++) {
+      const pageInfo = pages[i];
+      const pageNum = i + 1;
+      
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`🌐 PAGE ${pageNum}/${pages.length}: ${pageInfo.route}`);
+      console.log(`   URL: ${pageInfo.url}`);
+      console.log(`   Expectations: ${pageInfo.expectations.length}`);
+      console.log('='.repeat(80));
+      
       const result = await this.runPageTest(pageInfo);
       this.results.pages.push(result);
 
+      const passedTests = result.generatedTests.filter(t => t.passed).length;
+      const failedTests = result.generatedTests.filter(t => !t.passed).length;
+
+      console.log(`\n  📊 Page Result: ${passedTests} passed, ${failedTests} failed`);
+      
       if (result.passed) {
         this.results.passedPages++;
-        console.log(`✅ ${pageInfo.route} - PASSED`);
+        console.log(`  🎉 ${pageInfo.route} - OVERALL: ✅ PASSED`);
       } else {
         this.results.failedPages++;
-        console.log(`❌ ${pageInfo.route} - FAILED`);
+        console.log(`  💥 ${pageInfo.route} - OVERALL: ❌ FAILED`);
       }
     }
+
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`🏁 FINAL RESULTS`);
+    console.log(`   Total pages tested: ${pages.length}`);
+    console.log(`   Passed: ${this.results.passedPages}`);
+    console.log(`   Failed: ${this.results.failedPages}`);
+    
+    if (this.results.failedPages > 0) {
+      console.log(`\n❌ ${this.results.failedPages} page(s) failed - see details above`);
+    } else {
+      console.log(`\n✅ All tests passed! 🎉`);
+    }
+    console.log('='.repeat(80));
 
     const report = this.generateReport();
     await this.postResults(report);
