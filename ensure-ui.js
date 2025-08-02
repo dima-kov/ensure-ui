@@ -110,14 +110,10 @@ class EnsureUITester {
           // Skip the lines we've already processed
           i = currentLine - 1;
           
-          if (this.isValidExpectation(fullExpectation)) {
-            expectations.push({
-              text: fullExpectation,
-              lineNumber: startLineNumber
-            });
-          } else {
-            console.warn(`Ignoring unsupported expectation at ${filePath}:${startLineNumber}: "${fullExpectation}"`);
-          }
+          expectations.push({
+            text: fullExpectation,
+            lineNumber: startLineNumber
+          });
         }
       }
       return expectations;
@@ -127,24 +123,6 @@ class EnsureUITester {
     }
   }
 
-  // Validate that expectation is text/content based only
-  isValidExpectation(expectation) {
-    const unsupportedPatterns = [
-      // Flow/interaction patterns
-      /click|navigate|submit|fill|type|select/i,
-      /form.*valid|validate.*form/i,
-      /redirect|route|navigate/i,
-      // Dynamic behavior
-      /hover|focus|blur|change/i,
-      /animation|transition|load.*time/i,
-      // Multi-step flows
-      /then|after|when.*then|step/i,
-      // API/network patterns
-      /api|request|response|ajax|fetch/i
-    ];
-
-    return !unsupportedPatterns.some(pattern => pattern.test(expectation));
-  }
 
   isPageFile(filename) {
     const pagePatterns = [
@@ -229,22 +207,24 @@ class EnsureUITester {
 
   // Generate LLM prompt for test generation
   generateLLMPrompt(html, expectation) {
-    return `You are a Playwright testing expert. Generate ONLY the test assertion code.
+    return `You are a Playwright testing expert. Generate ONLY the test code to verify the expectation.
 
-STRICT RULES:
-- Output ONLY raw Playwright code, no explanations
-- Use await expect() assertions only
-- Focus on text content and element presence
-- Use simple, robust selectors
-- NO interactions (clicks, form fills, navigation)
-- NO flow testing - only static content verification
+RULES:
+- Output ONLY raw Playwright code, no explanations, no markdown
+- Use await expect() for assertions
+- Use page.click(), page.fill(), page.selectOption() for interactions when needed
+- Use simple, robust selectors (prefer text content, roles, or data-testid)
+- For static content: verify text presence, element existence, attributes
+- For interactions: perform actions then verify results
+- Handle both single assertions and multi-step flows
+- Be defensive with selectors (use page.locator() with good fallbacks)
 
 HTML:
 ${html}
 
 User Expectation: "${expectation}"
 
-Generate the Playwright assertion code:`;
+Generate the Playwright test code:`;
   }
 
   // Call OpenAI API to generate test code
@@ -277,7 +257,7 @@ Generate the Playwright assertion code:`;
               content: prompt
             }
           ],
-          max_tokens: 200,
+          max_tokens: 500,
           temperature: 0.1
         })
       });
