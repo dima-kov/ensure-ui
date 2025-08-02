@@ -667,7 +667,11 @@ Return JSON array of individual expectations:`;
     console.log(`   Failed: ${this.results.failedPages}`);
     
     if (this.results.failedPages > 0) {
-      console.log(`\n❌ ${this.results.failedPages} page(s) failed - see details above`);
+      console.log(`\n❌ Failed pages:`);
+      const failedPages_list = this.results.pages.filter(p => !p.passed);
+      failedPages_list.forEach(page => {
+        console.log(`   - ${page.route}`);
+      });
     } else {
       console.log(`\n✅ All tests passed! 🎉`);
     }
