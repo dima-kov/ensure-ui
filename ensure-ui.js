@@ -384,15 +384,16 @@ Generate minimal Playwright test code:`;
     const prompt = `You are a test flow analyzer. Analyze the following UI testing description and split it into individual test flows.
 
 FLOW ANALYSIS RULES:
-1. GENERAL CHECKS FIRST: Basic page functionality (loading, basic content) should be Flow 1
+1. GENERAL CHECKS FIRST: Page loading and SPECIFIC visible elements should be Flow 1
 2. FLOW SEPARATION: If user describes multiple user journeys/scenarios, each becomes a separate flow
 3. SEQUENTIAL STEPS: If user describes step-by-step actions, group related steps into flows
 4. ONE TEST PER FLOW: Each flow should test one complete user scenario
+5. BE SPECIFIC: NEVER use generic terms like "basic content" - describe EXACTLY what elements/text should be visible
 
 OUTPUT FORMAT:
 Return JSON array of objects with this structure:
 {
-  "description": "Brief description of what this flow tests",
+  "description": "SPECIFIC description of what this flow tests (mention exact elements, text, or functionality)",
   "testCode": "Complete Playwright test code for this flow"
 }
 
@@ -409,26 +410,34 @@ EXAMPLE SCENARIOS:
 Input: "page loads correctly and shows welcome message, then user can click login button and see login form"
 Output: [
   {
-    "description": "Page loads and shows basic content",
+    "description": "Page loads and displays welcome message",
     "testCode": "await expect(page).toHaveURL(/.*/);
 await expect(page.getByText('welcome message')).toBeVisible();"
   },
   {
-    "description": "User can access login form",
+    "description": "Login button click shows login form",
     "testCode": "await page.click('button:contains(\"login\")');
 await expect(page.getByText('login form')).toBeVisible();"
   }
 ]
 
-Input: "the contact form should work properly"
+Input: "register page loads with form, user fills email{random}@gmail.com and password random hash, submits and redirects to /members"
 Output: [
   {
-    "description": "Contact form functionality",
-    "testCode": "await expect(page.locator('form')).toBeVisible();
-await page.fill('input[name\"email\"]', 'test@example.com');
-await page.fill('textarea[name=\"message\"]', 'Test message');
+    "description": "Registration page loads and displays registration form with email and password fields",
+    "testCode": "await expect(page).toHaveURL(/.*register.*/);
+await expect(page.locator('form')).toBeVisible();
+await expect(page.locator('input[type=\"email\"]')).toBeVisible();
+await expect(page.locator('input[type=\"password\"]')).toBeVisible();"
+  },
+  {
+    "description": "User registration with dynamic credentials redirects to members page",
+    "testCode": "const randomEmail = \`email${Math.random().toString(36).substring(7)}@gmail.com\`;
+const randomHash = Math.random().toString(36).substring(2, 15);
+await page.fill('input[type=\"email\"]', randomEmail);
+await page.fill('input[type=\"password\"]', randomHash);
 await page.click('button[type=\"submit\"]');
-await expect(page.getByText('message sent')).toBeVisible();"
+await expect(page).toHaveURL(/.*\/members.*/);"
   }
 ]
 
