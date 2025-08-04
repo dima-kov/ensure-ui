@@ -574,8 +574,9 @@ ${commentText}`;
       await testFunction(page, expect, redirectChain);
       return true;
     } catch (error) {
-      console.error(`Generated test execution failed: ${error.message}`);
-      
+      console.error(`    Code was: ${testCode}`);
+      console.error(`    Error: ${error.message}`);
+
       // If this looks like a redirect test failure, show the redirect chain for debugging
       if (testCode.includes('redirectChain') && redirectChain && redirectChain.length > 0) {
         console.error(`       Redirect chain details:`);
