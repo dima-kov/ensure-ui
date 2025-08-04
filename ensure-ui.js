@@ -176,7 +176,7 @@ class EnsureUITester {
         const line = lines[i].trim();
         
         // Match: // ensureUI: some expectation text
-        const singleLineMatch = line.match(/\/\/\s*ensureUI:\s*(.+)/i);
+        const singleLineMatch = line.match(/\/\/\s*ensureUI\s*(.+)/i);
         if (singleLineMatch) {
           const startLineNumber = i + 1;
           let fullExpectation = singleLineMatch[1].trim();
@@ -186,7 +186,7 @@ class EnsureUITester {
           while (currentLine < lines.length) {
             const nextLine = lines[currentLine].trim();
             const continuationMatch = nextLine.match(/\/\/\s*(.+)/);
-            if (continuationMatch && !nextLine.match(/\/\/\s*ensureUI:/i)) {
+            if (continuationMatch && !nextLine.match(/\/\/\s*ensureUI/i)) {
               // Add all subsequent // lines as part of the testing prompt
               fullExpectation += ' ' + continuationMatch[1].trim();
               currentLine++;
