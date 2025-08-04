@@ -231,7 +231,7 @@ class EnsureUITester {
         }
       }
 
-      return [expectations, rawComments.join('\n')];
+      return [expectations, rawComments.map(c => c.text).join('\n')];
     } catch (error) {
       console.error(`Error reading file ${filePath}:`, error);
       return [];
