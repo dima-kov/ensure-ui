@@ -205,17 +205,16 @@ class EnsureUITester {
         }
       }
 
-      // Second pass: Split each raw comment into individual test flows using LLM
+      // Second pass: Split each raw comment into individual expectations using LLM
       const expectations = [];
       for (const comment of rawComments) {
         try {
-          const testFlows = await this.splitExpectations(comment.text);
+          const splitExpectations = await this.splitExpectations(comment.text);
           
-          // Add each test flow with the same line number
-          for (const flow of testFlows) {
+          // Add each split expectation with the same line number
+          for (const expectationText of splitExpectations) {
             expectations.push({
-              text: flow.description.trim(),
-              testCode: flow.testCode.trim(),
+              text: expectationText.trim(),
               lineNumber: comment.lineNumber,
               originalComment: comment.text // Keep reference to original
             });
@@ -225,8 +224,6 @@ class EnsureUITester {
           // Fallback: use original comment as single expectation
           expectations.push({
             text: comment.text,
-            testCode: `await expect(page).toHaveURL(/.*/);
-await expect(page.locator('body')).toBeVisible();`,
             lineNumber: comment.lineNumber,
             originalComment: comment.text
           });
@@ -379,99 +376,40 @@ Category: [Determine from keywords above]
 Generate minimal Playwright test code:`;
   }
 
-  // Split a single comment into multiple test flows with generated test code using LLM
+  // Split a single comment into multiple testable expectations using LLM
   async splitExpectations(commentText) {
-    const prompt = `You are a test flow analyzer. Analyze the following UI testing description and split it into individual test flows.
+    const prompt = `You are a test expectation analyzer. Split the following UI testing expectation into individual, specific, testable assertions.
 
-FLOW ANALYSIS RULES:
-1. GENERAL CHECKS FIRST: Page loading and SPECIFIC visible elements should be Flow 1
-2. FLOW SEPARATION: If user describes multiple user journeys/scenarios, each becomes a separate flow
-3. SEQUENTIAL STEPS: If user describes step-by-step actions, group related steps into flows
-4. ONE TEST PER FLOW: Each flow should test one complete user scenario
-5. BE SPECIFIC: NEVER use generic terms like "basic content" - describe EXACTLY what elements/text should be visible
-
-OUTPUT FORMAT:
-Return JSON array of objects with this structure:
-{
-  "description": "SPECIFIC description of what this flow tests (mention exact elements, text, or functionality)",
-  "testCode": "Complete Playwright test code for this flow"
-}
-
-TEST CODE REQUIREMENTS:
-- Include page navigation if needed: await page.goto('url');
-- Use proper Playwright assertions: await expect(...).toBe...();
-- Handle interactions: await page.click(), await page.fill(), etc.
-- Be complete and executable
-- No imports or require statements
-- Use 'page' and 'expect' variables (already available)
-
-EXAMPLE SCENARIOS:
-
-Input: "page loads correctly and shows welcome message, then user can click login button and see login form"
-Output: [
-  {
-    "description": "Page loads and displays welcome message",
-    "testCode": "await expect(page).toHaveURL(/.*/);
-await expect(page.getByText('welcome message')).toBeVisible();"
-  },
-  {
-    "description": "Login button click shows login form",
-    "testCode": "await page.click('button:contains(\"login\")');
-await expect(page.getByText('login form')).toBeVisible();"
-  }
-]
-
-Input: "register page loads with form, user fills email{random}@gmail.com and password random hash, submits and redirects to /members"
-Output: [
-  {
-    "description": "Registration page loads and displays registration form with email and password fields",
-    "testCode": "await expect(page).toHaveURL(/.*register.*/);
-await expect(page.locator('form')).toBeVisible();
-await expect(page.locator('input[type=\"email\"]')).toBeVisible();
-await expect(page.locator('input[type=\"password\"]')).toBeVisible();"
-  },
-  {
-    "description": "User registration with dynamic credentials redirects to members page",
-    "testCode": "const randomEmail = \`email${Math.random().toString(36).substring(7)}@gmail.com\`;
-const randomHash = Math.random().toString(36).substring(2, 15);
-await page.fill('input[type=\"email\"]', randomEmail);
-await page.fill('input[type=\"password\"]', randomHash);
-await page.click('button[type=\"submit\"]');
-await expect(page).toHaveURL(/.*\/members.*/);"
-  }
-]
+RULES:
+- Each expectation should test ONE specific thing
+- Output as JSON array of strings
+- Be specific and actionable
+- Preserve the original intent
+- If there's only one expectation, return array with one item
 
 Comment: "${commentText}"
 
-Return JSON array of flow objects:`;
+Return JSON array of individual expectations:`;
 
-    const systemPrompt = 'You are a test flow analyzer. Split UI testing descriptions into executable test flows. Return only valid JSON array of objects with description and testCode fields.';
+    const systemPrompt = 'You are a test expectation analyzer. Split UI testing expectations into individual testable assertions. Return only valid JSON array of strings.';
 
     try {
-      const result = await this.llm.generateText(prompt, systemPrompt, 800, 0.1);
+      const result = await this.llm.generateText(prompt, systemPrompt, 300, 0.1);
       
       // Clean and parse JSON
       const cleanResult = result.replace(/```json\n?/g, '').replace(/```/g, '').trim();
-      const flows = JSON.parse(cleanResult);
+      const expectations = JSON.parse(cleanResult);
       
-      // Validate structure
-      if (!Array.isArray(flows) || !flows.every(flow => 
-        typeof flow === 'object' && 
-        typeof flow.description === 'string' && 
-        typeof flow.testCode === 'string'
-      )) {
+      // Validate it's an array of strings
+      if (!Array.isArray(expectations) || !expectations.every(exp => typeof exp === 'string')) {
         throw new Error('Invalid response format from LLM');
       }
       
-      return flows;
+      return expectations;
     } catch (error) {
-      console.error('LLM flow splitting failed:', error);
-      // Fallback: return original comment as single basic test
-      return [{
-        description: commentText,
-        testCode: `await expect(page).toHaveURL(/.*/);
-await expect(page.locator('body')).toBeVisible();`
-      }];
+      console.error('LLM expectation splitting failed:', error);
+      // Fallback: return original comment as single expectation
+      return [commentText];
     }
   }
 
@@ -554,19 +492,16 @@ await expect(page.locator('body')).toBeVisible();`
       // Get HTML content for LLM
       const htmlContent = await page.content();
 
-      // Run each expectation as isolated test flow
+      // Generate and run tests for each expectation
       for (let i = 0; i < pageInfo.expectations.length; i++) {
         const expectation = pageInfo.expectations[i];
         const testNum = i + 1;
         
-        console.log(`\n    ${testNum}. Testing Flow: "${expectation.text}"`);
+        console.log(`\n    ${testNum}. Testing: "${expectation.text}"`);
 
         try {
-          // Use pre-generated test code from splitExpectations
-          const testCode = expectation.testCode || await this.generateTestCode(htmlContent, expectation.text, pageInfo.url, redirectChain);
-          
-          // Run test in complete isolation - create new page context
-          const testPassed = await this.executeIsolatedTest(pageInfo.url, testCode, redirectChain);
+          const testCode = await this.generateTestCode(htmlContent, expectation.text, pageInfo.url, redirectChain);
+          const testPassed = await this.executeGeneratedTest(page, testCode, redirectChain);
 
           testResult.generatedTests.push({
             expectation: expectation.text,
@@ -588,7 +523,7 @@ await expect(page.locator('body')).toBeVisible();`
           testResult.generatedTests.push({
             expectation: expectation.text,
             lineNumber: expectation.lineNumber,
-            generatedCode: expectation.testCode || null,
+            generatedCode: null,
             passed: false,
             error: error.message
           });
@@ -622,62 +557,7 @@ await expect(page.locator('body')).toBeVisible();`
     return testResult;
   }
 
-  // Execute test in complete isolation with fresh browser context
-  async executeIsolatedTest(pageUrl, testCode, redirectChain) {
-    const browser = await chromium.launch();
-    const context = await browser.newContext({
-      viewport: { width: 1280, height: 720 }
-    });
-    const page = await context.newPage();
-
-    try {
-      // Track redirects for this isolated test
-      const isolatedRedirectChain = [];
-      
-      page.on('response', response => {
-        isolatedRedirectChain.push({
-          url: response.url(),
-          status: response.status(),
-          location: response.headers()['location'] || null
-        });
-      });
-
-      // Navigate to page if testCode doesn't include navigation
-      if (!testCode.includes('page.goto')) {
-        await page.goto(pageUrl, {
-          waitUntil: 'networkidle',
-          timeout: this.timeout
-        });
-      }
-
-      // Create a safe execution context
-      const testFunction = new Function('page', 'expect', 'redirectChain', `
-        return (async () => {
-          ${testCode}
-          return true;
-        })();
-      `);
-      
-      await testFunction(page, expect, isolatedRedirectChain.length > 0 ? isolatedRedirectChain : redirectChain);
-      return true;
-    } catch (error) {
-      console.error(`Isolated test execution failed: ${error.message}`);
-      
-      // If this looks like a redirect test failure, show the redirect chain for debugging
-      if (testCode.includes('redirectChain') && redirectChain && redirectChain.length > 0) {
-        console.error(`       Redirect chain details:`);
-        redirectChain.forEach((redirect, index) => {
-          console.error(`       ${index + 1}. ${redirect.url} -> Status: ${redirect.status}${redirect.location ? ` -> Location: ${redirect.location}` : ''}`);
-        });
-      }
-      
-      return false;
-    } finally {
-      await browser.close();
-    }
-  }
-
-  // Legacy method for backward compatibility
+  // Execute the LLM-generated test code safely
   async executeGeneratedTest(page, testCode, redirectChain) {
     try {
       // Create a safe execution context
