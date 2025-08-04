@@ -505,7 +505,7 @@ ${commentText}`;
 
         try {
           const testCode = await this.generateTestCode(htmlContent, expectation.text, pageInfo.url, redirectChain);
-          console.log(`       Code: ${testCode}`);
+          console.log(`       Code:\n${testCode}`);
           const testPassed = await this.executeGeneratedTest(page, testCode, redirectChain);
 
           testResult.generatedTests.push({
