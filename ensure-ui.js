@@ -100,7 +100,7 @@ class EnsureUITester {
     
     // Initialize LLM provider based on environment variables
     // const llmProvider = process.env.OPENAI_API_KEY ? 'openai' : 'anthropic';
-    const llmProvider = 'openai';
+    const llmProvider = 'anthropic';
     const openaiApiKey = process.env.OPENAI_API_KEY;
     const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
     
