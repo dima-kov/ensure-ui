@@ -8,8 +8,11 @@ inputs:
     description: 'GitHub token for PR comments'
     required: true
   openai-api-key:
-    description: 'OpenAI API key for test generation'
-    required: true
+    description: 'OpenAI API key'
+    required: false
+  anthropic-api-key:
+    description: 'Anthropic API key'
+    required: false
   timeout:
     description: 'Page load timeout in seconds'
     required: false
