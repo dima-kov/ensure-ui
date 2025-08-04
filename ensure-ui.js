@@ -505,6 +505,7 @@ ${commentText}`;
 
         try {
           const testCode = await this.generateTestCode(htmlContent, expectation.text, pageInfo.url, redirectChain);
+          console.log(`       Code: ${testCode}`);
           const testPassed = await this.executeGeneratedTest(page, testCode, redirectChain);
 
           testResult.generatedTests.push({
@@ -515,7 +516,6 @@ ${commentText}`;
             error: testPassed ? null : 'Assertion failed'
           });
 
-          console.log(`       Generated code: ${testCode}`);
           if (testPassed) {
             console.log(`       ✅ PASSED`);
           } else {
@@ -574,7 +574,6 @@ ${commentText}`;
       await testFunction(page, expect, redirectChain);
       return true;
     } catch (error) {
-      console.error(`    Code was: ${testCode}`);
       console.error(`    Error: ${error.message}`);
 
       // If this looks like a redirect test failure, show the redirect chain for debugging
