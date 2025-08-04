@@ -171,40 +171,27 @@ class EnsureUITester {
       const rawComments = [];
       const lines = content.split('\n');
 
-      // First pass: Extract raw comments (same as before)
+      // First pass: Extract raw comments
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         
         // Match: // ensureUI: some expectation text
-        const singleLineMatch = line.match(/\/\/\s*ensureUI\s*(.+)/i);
+        const singleLineMatch = line.match(/\/\/\s*ensureUI:\s*(.+)/i);
         if (singleLineMatch) {
-          // Check if this starts a multi-line expectation
           const startLineNumber = i + 1;
           let fullExpectation = singleLineMatch[1].trim();
           let currentLine = i + 1;
           
-          // Look for continuation lines that start with // and contain "also:"
+          // Look for continuation lines that start with //
           while (currentLine < lines.length) {
             const nextLine = lines[currentLine].trim();
-            const continuationMatch = nextLine.match(/\/\/\s*also:\s*(.+)/i);
-            if (continuationMatch) {
-              fullExpectation += ', ' + continuationMatch[1].trim();
+            const continuationMatch = nextLine.match(/\/\/\s*(.+)/);
+            if (continuationMatch && !nextLine.match(/\/\/\s*ensureUI:/i)) {
+              // Add all subsequent // lines as part of the testing prompt
+              fullExpectation += ' ' + continuationMatch[1].trim();
               currentLine++;
             } else {
-              // Check for generic continuation (just // followed by text, no "also:")
-              const genericContinuation = nextLine.match(/\/\/\s*(.+)/);
-              if (genericContinuation && !nextLine.match(/\/\/\s*ensureUI/i)) {
-                // Only continue if it looks like part of the expectation
-                const continuationText = genericContinuation[1].trim();
-                if (continuationText && !continuationText.startsWith('TODO') && !continuationText.startsWith('FIXME') && !continuationText.startsWith('NOTE')) {
-                  fullExpectation += ', ' + continuationText;
-                  currentLine++;
-                } else {
-                  break;
-                }
-              } else {
-                break;
-              }
+              break;
             }
           }
           
