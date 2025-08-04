@@ -150,13 +150,14 @@ class EnsureUITester {
       if (stat.isDirectory()) {
         await this.scanDirectory(fullPath, pages);
       } else if (this.isPageFile(item)) {
-        const expectations = await this.extractEnsureUIComments(fullPath);
+        const [expectations, rawExpectations] = await this.extractEnsureUIComments(fullPath);
         if (expectations.length > 0) {
           const route = this.getRouteFromPath(fullPath);
           pages.push({
             filePath: fullPath,
             route: route,
             url: `${this.deploymentUrl}${route}`,
+            rawExpectations: rawExpectations,
             expectations: expectations
           });
         }
@@ -230,7 +231,7 @@ class EnsureUITester {
         }
       }
 
-      return expectations;
+      return [expectations, rawComments.join('\n')];
     } catch (error) {
       console.error(`Error reading file ${filePath}:`, error);
       return [];
@@ -606,7 +607,7 @@ ${commentText}`;
     this.results.totalPages = pages.length;
 
     for (let i = 0; i < pages.length; i++) {
-      const pageInfo = pages[i];
+      const page = pages[i];
       const pageNum = i + 1;
       
       // Only show separator between pages (not before first page)
@@ -614,11 +615,12 @@ ${commentText}`;
         console.log(`\n${'='.repeat(80)}`);
       }
       
-      console.log(`\n🌐 ${pageInfo.route}`);
-      console.log(`   URL: ${pageInfo.url}`);
-      console.log(`   Expectations: ${pageInfo.expectations.length}`);
+      console.log(`\n🌐 ${page.route}`);
+      console.log(`   URL: ${page.url}`);
+      console.log(`   Ensure: ${page.rawExpectations}`);
+      console.log(`   Expectations: ${page.expectations.length}`);
       
-      const result = await this.runPageTest(pageInfo);
+      const result = await this.runPageTest(page);
       this.results.pages.push(result);
 
       const passedTests = result.generatedTests.filter(t => t.passed).length;
