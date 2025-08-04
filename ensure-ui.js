@@ -563,7 +563,23 @@ ${commentText}`;
 
   // Execute the LLM-generated test code safely
   async executeGeneratedTest(page, testCode, redirectChain) {
+    let isolatedPage = null;
+    
     try {
+      // Create a new isolated page with clean cookies
+      const context = page.context();
+      isolatedPage = await context.newPage();
+      
+      // Clear any existing cookies to ensure isolation
+      await context.clearCookies();
+
+      // Navigate to the same URL as the original page
+      const currentUrl = page.url();
+      await isolatedPage.goto(currentUrl, {
+        waitUntil: 'networkidle',
+        timeout: this.timeout
+      });
+      
       // Create a safe execution context
       const testFunction = new Function('page', 'expect', 'redirectChain', `
         return (async () => {
@@ -571,7 +587,7 @@ ${commentText}`;
           return true;
         })();
       `);
-      await testFunction(page, expect, redirectChain);
+      await testFunction(isolatedPage, expect, redirectChain);
       return true;
     } catch (error) {
       console.error(`    Error: ${error.message}`);
@@ -585,6 +601,15 @@ ${commentText}`;
       }
       
       return false;
+    } finally {
+      // Clean up the isolated page
+      if (isolatedPage) {
+        try {
+          await isolatedPage.close();
+        } catch (closeError) {
+          console.error(`    Warning: Failed to close isolated page: ${closeError.message}`);
+        }
+      }
     }
   }
 
