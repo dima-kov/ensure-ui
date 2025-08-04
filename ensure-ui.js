@@ -379,16 +379,18 @@ Generate minimal Playwright test code:`;
 
   // Split a single comment into multiple testable expectations using LLM
   async splitExpectations(commentText) {
-    const prompt = `You are a Test Expectation Splitter.  
+    const prompt = `You are a Senior QA.
 Your task: convert the user's natural language test expectations into a **pure JSON array of strings**,  
-where each string is a single actionable test.
+where each string represents a complete test scenario or independent test expectation.
 
 Rules:
-1. Split by explicit separators first: new lines, numbered lists, bullet points.
-2. If a single expectation contains multiple independent checks, split them into separate items.
-3. Do **not** add any explanations or extra keys; output JSON array only.
-4. Preserve original wording unless a **minimal rewrite** is needed to form a clear standalone test.
-5. Each item must be specific and actionable as an independent test.
+1. Split by major test boundaries: explicit test labels (Test1, Test2, etc.), or distinct test scenarios separated by blank lines.
+2. Keep related test steps within the same scenario grouped together as a single item.
+3. For setup/utility expectations (like "ensureUI", "page loaded", etc.) that aren't part of a specific test, treat as separate items.
+4. Do **not** add any explanations or extra keys; output JSON array only.
+5. Preserve original wording unless a **minimal rewrite** is needed for clarity.
+6. Each item should represent either a complete test flow or an independent verification.
+7. When combining steps within a test, use "then" to connect sequential actions.
 
 User expectations:
 ${commentText}`;
