@@ -386,7 +386,7 @@ where each string represents a complete test scenario or independent test expect
 
 Rules:
 1. Split by major test boundaries: explicit test labels (Test1, Test2, etc.), or distinct test scenarios separated by blank lines.
-2. Keep related test steps within the same scenario grouped together as a single item.
+2. Keep related test steps within the same scenario grouped together as a single item. Group standalone assertions (content checks that don't require user actions) together. For tests requiring user interactions (clicks, navigation, form filling, etc.), preserve the exact order as specified in the original input.
 3. For setup/utility expectations (like "ensureUI", "page loaded", etc.) that aren't part of a specific test, treat as separate items.
 4. Do **not** add any explanations or extra keys; output JSON array only.
 5. Preserve original wording unless a **minimal rewrite** is needed for clarity.
