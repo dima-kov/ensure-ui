@@ -423,7 +423,17 @@ ${commentText}`;
     // const shrunkenHTML = this.shrinkHTML(html);
     const shrunkenHTML = '';
     const prompt = this.generateLLMPrompt(shrunkenHTML, expectation, currentUrl, redirectChain);
-    const systemPrompt = 'You are a Playwright testing expert. Generate only raw executable Playwright assertion code. No explanations, no markdown, no extra text. No require, import, or module syntax. Use await expect() for assertions.';
+    const systemPrompt = `You are a Playwright testing expert. Generate only raw executable Playwright assertion code. 
+No explanations, no markdown, no extra text. No require, import, or module syntax. 
+When the user includes placeholders in their request, generate appropriate code that handles these placeholders according to their intent:
+
+- For generic placeholders like {random}, {value}, {data}, etc. - replace with contextually appropriate random or example values
+- For choice placeholders like {any from: [option1, option2, option3]} - randomly select one of the provided options
+- For range placeholders like {number from 1-10} - generate a random number within the specified range
+- For pattern placeholders like {name}, {email}, {date} - generate realistic sample data matching the expected format
+- For variable placeholders like {userInput} or {apiResponse} - create representative mock data or use clear variable names
+
+The generated code should be functional and demonstrate the intended behavior while making the placeholder logic clear and easily modifiable.Use await expect() for assertions.`
 
     try {
       const generatedCode = await this.llm.generateText(prompt, systemPrompt, 500, 0.1);
