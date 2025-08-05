@@ -501,7 +501,7 @@ ${commentText}`;
         const expectation = pageInfo.expectations[i];
         const testNum = i + 1;
         
-        console.log(`\n    ${testNum}. Testing: "${expectation.text}"`);
+        console.log(`\n\n${testNum}. Testing: "${expectation.text}"`);
 
         try {
           const testCode = await this.generateTestCode(htmlContent, expectation.text, pageInfo.url, redirectChain);
@@ -532,6 +532,7 @@ ${commentText}`;
             error: error.message
           });
         }
+        console.log('\n');
       }
 
       // Take screenshot
