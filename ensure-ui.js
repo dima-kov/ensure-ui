@@ -455,7 +455,6 @@ ${commentText}`;
       },
       generatedTests: [],
       consoleErrors: [],
-      screenshot: null,
       error: null
     };
 
@@ -503,8 +502,6 @@ ${commentText}`;
 
         console.log(' ');
         console.log(`\n${testNum}. Testing: "${expectation.text}"`);
-        console.log(' ');
-
         try {
           const testCode = await this.generateTestCode(htmlContent, expectation.text, pageInfo.url, redirectChain);
           console.log(`Code:\n${testCode}`);
@@ -535,9 +532,6 @@ ${commentText}`;
           });
         }
       }
-
-      // Take screenshot
-      testResult.screenshot = await this.takeScreenshot(page, pageInfo.route);
 
       // Overall test result
       testResult.passed = testResult.basicChecks.pageLoaded &&
@@ -604,6 +598,7 @@ ${commentText}`;
         })();
       `);
       await testFunction(isolatedPage, expect, redirectChain);
+      await this.takeScreenshot(page, pageInfo.route);
       return true;
     } catch (error) {
       console.error(`Error: ${error.message}`);
