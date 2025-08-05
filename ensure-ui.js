@@ -503,9 +503,7 @@ ${commentText}`;
 
         console.log(' ');
         console.log(`\n${testNum}. Testing: "${expectation.text}"`);
-        console.log('\n\n');
-        console.log('testingnow:');
-        console.log();
+        console.log(' ');
 
         try {
           const testCode = await this.generateTestCode(htmlContent, expectation.text, pageInfo.url, redirectChain);
@@ -536,7 +534,6 @@ ${commentText}`;
             error: error.message
           });
         }
-        console.log(' ');
       }
 
       // Take screenshot
@@ -671,17 +668,12 @@ ${commentText}`;
       const result = await this.runPageTest(page);
       this.results.pages.push(result);
 
-      const passedTests = result.generatedTests.filter(t => t.passed).length;
-      const failedTests = result.generatedTests.filter(t => !t.passed).length;
-
-      console.log(`\n📊 Page Result: ${passedTests} passed, ${failedTests} failed`);
-      
       if (result.passed) {
         this.results.passedPages++;
-        console.log(`🎉 OVERALL: ✅ PASSED`);
+        console.log(`✅ PASSED`);
       } else {
         this.results.failedPages++;
-        console.log(`💥 OVERALL: ❌ FAILED`);
+        console.log(`❌ FAILED`);
       }
     }
 
