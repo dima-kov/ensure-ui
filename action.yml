@@ -93,10 +93,7 @@ runs:
           Commit: ${{ github.sha }}
 
           # Check if remote branch exists and delete it if so
-          if git ls-remote --exit-code --heads origin "$SCREENSHOT_BRANCH" >/dev/null 2>&1; then
-            echo "🗑️ Remote branch $SCREENSHOT_BRANCH already exists, deleting it..."
-            git push origin --delete "$SCREENSHOT_BRANCH"
-          fi
+          git push origin --delete "$SCREENSHOT_BRANCH" || echo "Branch didn't exist or already deleted"
 
           # Push with explicit upstream setting
           echo "🚀 Pushing branch..."
