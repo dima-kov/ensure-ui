@@ -88,9 +88,9 @@ runs:
           
           echo "🤖 Generated screenshots from EnsureUI testing"
 
-          Branch: ${{ github.ref_name }}
-          Run ID: ${{ github.run_id }}
-          Commit: ${{ github.sha }}
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "Commit: ${{ github.sha }}"
 
           # Check if remote branch exists and delete it if so
           git push origin --delete "$SCREENSHOT_BRANCH" || echo "Branch didn't exist or already deleted"
