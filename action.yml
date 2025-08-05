@@ -72,6 +72,8 @@ runs:
         # Configure git
         git config --local user.email "action@github.com"
         git config --local user.name "EnsureUI Action"
+
+        git remote set-url origin https://x-access-token:${{ inputs.github-token }}@github.com/${{ github.repository }}.git
         
         # Get current branch name and create screenshot branch name
         CURRENT_BRANCH="${{ github.ref_name }}"
@@ -103,5 +105,3 @@ runs:
         fi
       shell: bash
       working-directory: ${{ github.workspace }}
-      env:
-        GITHUB_TOKEN: ${{ inputs.github-token }}
