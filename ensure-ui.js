@@ -501,7 +501,7 @@ ${commentText}`;
         const expectation = pageInfo.expectations[i];
         const testNum = i + 1;
 
-        console.log('\n')
+        console.log('\n');
         console.log(`\n${testNum}. Testing: "${expectation.text}"`);
 
         try {
