@@ -500,8 +500,9 @@ ${commentText}`;
       for (let i = 0; i < pageInfo.expectations.length; i++) {
         const expectation = pageInfo.expectations[i];
         const testNum = i + 1;
-        
-        console.log(`\n\n${testNum}. Testing: "${expectation.text}"`);
+
+        console.log('\n')
+        console.log(`\n${testNum}. Testing: "${expectation.text}"`);
 
         try {
           const testCode = await this.generateTestCode(htmlContent, expectation.text, pageInfo.url, redirectChain);
@@ -670,7 +671,7 @@ ${commentText}`;
       const passedTests = result.generatedTests.filter(t => t.passed).length;
       const failedTests = result.generatedTests.filter(t => !t.passed).length;
 
-      console.log(`\n  📊 Page Result: ${passedTests} passed, ${failedTests} failed`);
+      console.log(`\n📊 Page Result: ${passedTests} passed, ${failedTests} failed`);
       
       if (result.passed) {
         this.results.passedPages++;
@@ -681,7 +682,7 @@ ${commentText}`;
       }
     }
 
-    console.log(`\n${'='.repeat(80)}`);
+    console.log(`\n\n${'='.repeat(80)}\n\n`);
     console.log(`🏁 FINAL RESULTS`);
     console.log(`Total pages tested: ${pages.length}`);
     console.log(`Passed: ${this.results.passedPages}`);
