@@ -73,12 +73,6 @@ runs:
         git config --local user.email "action@github.com"
         git config --local user.name "EnsureUI Action"
 
-#        git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
-        
-#        echo "🔄 Fetching latest refs..."
-#        git fetch origin
-
-        # Get current branch name and create screenshot branch name
         CURRENT_BRANCH="${{ github.ref_name }}"
         SCREENSHOT_BRANCH="${CURRENT_BRANCH}-ensureui-${{ github.run_id }}"
         
