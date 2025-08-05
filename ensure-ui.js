@@ -598,12 +598,12 @@ ${commentText}`;
         })();
       `);
       await testFunction(isolatedPage, expect, redirectChain);
-      await this.takeScreenshot(page, pageInfo.route);
+      await this.takeScreenshot(isolatedPage, pageInfo.route);
       return true;
     } catch (error) {
       console.error(`Error: ${error.message}`);
 
-      await this.takeScreenshot(page, pageInfo.route);
+      await this.takeScreenshot(isolatedPage, pageInfo.route);
 
       // If this looks like a redirect test failure, show the redirect chain for debugging
       if (testCode.includes('redirectChain') && redirectChain && redirectChain.length > 0) {
