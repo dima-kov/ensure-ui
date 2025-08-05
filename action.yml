@@ -4,9 +4,6 @@ inputs:
   deployment-url:
     description: 'URL of the deployed application'
     required: true
-  github-token:
-    description: 'GitHub token for PR comments'
-    required: true
   openai-api-key:
     description: 'OpenAI API key'
     required: false
@@ -55,7 +52,7 @@ runs:
         PROJECT_ROOT: ${{ github.workspace }}
         DEPLOYMENT_URL: ${{ inputs.deployment-url }}
         TIMEOUT: ${{ inputs.timeout }}
-        GITHUB_TOKEN: ${{ inputs.github-token }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         OPENAI_API_KEY: ${{ inputs.openai-api-key }}
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         GITHUB_REPOSITORY: ${{ github.repository }}
@@ -104,4 +101,4 @@ runs:
       shell: bash
       working-directory: ${{ github.workspace }}
       env:
-        GITHUB_TOKEN: ${{ inputs.github-token }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
