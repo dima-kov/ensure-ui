@@ -66,6 +66,65 @@ runs:
         GITHUB_REF_NAME: ${{ github.ref_name }}
         GITHUB_RUN_ID: ${{ github.run_id }}
 
+    - name: Debug Token Identity and Permissions
+      run: |
+        echo "🔍 Checking token identity and permissions..."
+        
+        # Check who/what is authenticated with this token
+        echo "👤 Token identity:"
+        curl -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/user | jq '{login, type, id, node_id}'
+        
+        # Check if it's a GitHub App installation token
+        echo "🤖 App installation details:"
+        curl -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/installation | jq '{id, app_id, app_slug, target_type, target_id, permissions}'
+        
+        # Check token scopes (for personal access tokens)
+        echo "🔑 Token scopes (if any):"
+        curl -I -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/user | grep -i "x-oauth-scopes\|x-accepted-oauth-scopes" || echo "No OAuth scopes found (likely GitHub App token)"
+        
+        # Check rate limits to see what type of token this is
+        echo "⏱️ Rate limit info:"
+        curl -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/rate_limit | jq '.resources.core'
+        
+        # Check specific repository permissions for this installation
+        echo "📁 Repository-specific permissions:"
+        curl -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/repos/${{ github.repository }}/collaborators/$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" https://api.github.com/user | jq -r '.login')/permission 2>/dev/null || echo "Could not check collaborator permissions"
+        
+        # Alternative: Check installation permissions on this specific repo
+        echo "🏢 Installation repository permissions:"
+        curl -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/installation/repositories | jq '.repositories[] | select(.full_name == "${{ github.repository }}") | {full_name, permissions}'
+        
+        # Check if we can get installation token info
+        echo "🔧 Token validation:"
+        curl -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/applications/grants 2>/dev/null || echo "Not a personal access token"
+             
+        # Try to get the actual app details
+        echo "📱 App details:"
+        APP_ID=$(curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github.v3+json" https://api.github.com/installation | jq -r '.app_id // empty')
+        if [ -n "$APP_ID" ]; then
+          echo "App ID: $APP_ID"
+          curl -H "Accept: application/vnd.github.v3+json" \
+               https://api.github.com/apps/$APP_ID | jq '{name, slug, owner, permissions}'
+        fi
+
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+
     - name: Debug GitHub App Token
       run: |
         echo "🔍 Testing GitHub App token permissions..."
@@ -101,7 +160,7 @@ runs:
         git config --local user.email "action@github.com"
         git config --local user.name "EnsureUI Action"
 
-        git remote set-url origin https://x-access-token:${{ inputs.github-token }}@github.com/${{ github.repository }}.git
+        git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
         
         # Fetch latest to ensure we have all refs
         echo "🔄 Fetching latest refs..."
@@ -137,4 +196,6 @@ runs:
           echo "No screenshots found to save"
         fi
       shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
       working-directory: ${{ github.workspace }}
