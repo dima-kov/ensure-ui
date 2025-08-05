@@ -505,7 +505,7 @@ ${commentText}`;
 
         try {
           const testCode = await this.generateTestCode(htmlContent, expectation.text, pageInfo.url, redirectChain);
-          console.log(`       Code:\n${testCode}`);
+          console.log(`Code:\n${testCode}`);
           const testPassed = await this.executeGeneratedTest(page, testCode, redirectChain);
 
           testResult.generatedTests.push({
@@ -517,13 +517,13 @@ ${commentText}`;
           });
 
           if (testPassed) {
-            console.log(`       ✅ PASSED`);
+            console.log(`✅ PASSED`);
           } else {
-            console.log(`       ❌ FAILED - Assertion failed`);
+            console.log(`❌ FAILED - Assertion failed`);
           }
 
         } catch (error) {
-          console.log(`       ❌ FAILED - ${error.message}`);
+          console.log(`❌ FAILED - ${error.message}`);
           testResult.generatedTests.push({
             expectation: expectation.text,
             lineNumber: expectation.lineNumber,
@@ -566,11 +566,10 @@ ${commentText}`;
     
     // Log GitHub URL for the screenshot
     if (process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
-      const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
       const branchName = process.env.GITHUB_REF_NAME || process.env.GITHUB_REF?.replace('refs/heads/', '') || 'main';
       const screenshotBranch = `${branchName}-ensureui-${process.env.GITHUB_RUN_ID}`;
-      const githubUrl = `https://github.com/${owner}/${repo}/blob/${screenshotBranch}/screenshots/${screenshotFilename}`;
-      console.log(`📸 Screenshot URL: ${githubUrl}`);
+      const githubUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/blob/${screenshotBranch}/screenshots/${screenshotFilename}`;
+      console.log(`📸 Screenshot: ${githubUrl}`);
     }
     
     return screenshotPath;
@@ -658,9 +657,9 @@ ${commentText}`;
       }
       
       console.log(`\n🌐 ${page.route}`);
-      console.log(`   URL: ${page.url}`);
-      console.log(`   Ensure: ${page.rawExpectations}`);
-      console.log(`   Expectations: ${page.expectations.length}`);
+      console.log(`URL: ${page.url}`);
+      console.log(`Ensure: ${page.rawExpectations}`);
+      console.log(`Expectations: ${page.expectations.length}`);
       
       const result = await this.runPageTest(page);
       this.results.pages.push(result);
@@ -672,38 +671,29 @@ ${commentText}`;
       
       if (result.passed) {
         this.results.passedPages++;
-        console.log(`  🎉 OVERALL: ✅ PASSED`);
+        console.log(`🎉 OVERALL: ✅ PASSED`);
       } else {
         this.results.failedPages++;
-        console.log(`  💥 OVERALL: ❌ FAILED`);
+        console.log(`💥 OVERALL: ❌ FAILED`);
       }
     }
 
     console.log(`\n${'='.repeat(80)}`);
     console.log(`🏁 FINAL RESULTS`);
-    console.log(`   Total pages tested: ${pages.length}`);
-    console.log(`   Passed: ${this.results.passedPages}`);
-    console.log(`   Failed: ${this.results.failedPages}`);
+    console.log(`Total pages tested: ${pages.length}`);
+    console.log(`Passed: ${this.results.passedPages}`);
+    console.log(`Failed: ${this.results.failedPages}`);
     
     if (this.results.failedPages > 0) {
       console.log(`\n❌ Failed pages:`);
       const failedPages_list = this.results.pages.filter(p => !p.passed);
       failedPages_list.forEach(page => {
-        console.log(`   - ${page.route}`);
+        console.log(`- ${page.route}`);
       });
     } else {
       console.log(`\n✅ All tests passed! 🎉`);
     }
     console.log('='.repeat(80));
-
-    // Add screenshot artifact information
-    if (this.results.pages.some(page => page.screenshot)) {
-      console.log(`\n📸 Screenshots saved to workflow artifacts`);
-      if (process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
-        const artifactUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
-        console.log(`   View artifacts: ${artifactUrl}`);
-      }
-    }
 
     // Output results using new GitHub Actions format
     if (process.env.GITHUB_OUTPUT) {
