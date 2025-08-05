@@ -84,7 +84,7 @@ runs:
         
         if [ -d "screenshots" ] && [ "$(ls -A screenshots)" ]; then
           git add screenshots/
-          git commit -m "EnsureUI screenshots for run ${{ github.run_id }}
+          git commit -m "EnsureUI screenshots for run ${{ github.run_id }}"
           
           echo "🤖 Generated screenshots from EnsureUI testing"
 
