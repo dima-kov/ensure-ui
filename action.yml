@@ -66,6 +66,34 @@ runs:
         GITHUB_REF_NAME: ${{ github.ref_name }}
         GITHUB_RUN_ID: ${{ github.run_id }}
 
+    - name: Debug GitHub App Token
+      run: |
+        echo "🔍 Testing GitHub App token permissions..."
+        
+        # Test API call to check what permissions the token actually has
+        echo "📋 Checking token permissions via API:"
+        curl -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/repos/${{ github.repository }} | jq '.permissions // "No permissions found"'
+        
+        # Check if we can create a branch via API (this should work if permissions are correct)
+        echo "🌿 Testing branch creation via API:"
+        curl -X POST \
+             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/repos/${{ github.repository }}/git/refs \
+             -d '{"ref":"refs/heads/test-permissions-'"${{ github.run_id }}"'","sha":"${{ github.sha }}"}' || echo "API branch creation failed"
+        
+        # Check the installation ID and app permissions
+        echo "🔧 App installation info:"
+        curl -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/installation/repositories | jq '.repositories[0].permissions // "No permissions found"'
+
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+
     - name: Save screenshots to separate branch
       if: always() && hashFiles('screenshots/*.png') != ''
       run: |
