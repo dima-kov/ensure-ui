@@ -506,7 +506,7 @@ ${commentText}`;
         try {
           const testCode = await this.generateTestCode(htmlContent, expectation.text, pageInfo.url, redirectChain);
           console.log(`Code:\n${testCode}`);
-          const testPassed = await this.executeGeneratedTest(page, testCode, redirectChain);
+          const testPassed = await this.executeGeneratedTest(page, testCode, redirectChain, pageInfo);
 
           testResult.generatedTests.push({
             expectation: expectation.text,
@@ -576,7 +576,7 @@ ${commentText}`;
   }
 
   // Execute the LLM-generated test code safely
-  async executeGeneratedTest(page, testCode, redirectChain) {
+  async executeGeneratedTest(page, testCode, redirectChain, pageInfo) {
     let isolatedPage = null;
     
     try {
@@ -604,13 +604,15 @@ ${commentText}`;
       await testFunction(isolatedPage, expect, redirectChain);
       return true;
     } catch (error) {
-      console.error(`    Error: ${error.message}`);
+      console.error(`Error: ${error.message}`);
+
+      await this.takeScreenshot(page, pageInfo.route);
 
       // If this looks like a redirect test failure, show the redirect chain for debugging
       if (testCode.includes('redirectChain') && redirectChain && redirectChain.length > 0) {
-        console.error(`       Redirect chain details:`);
+        console.error(`Redirect chain details:`);
         redirectChain.forEach((redirect, index) => {
-          console.error(`       ${index + 1}. ${redirect.url} -> Status: ${redirect.status}${redirect.location ? ` -> Location: ${redirect.location}` : ''}`);
+          console.error(`${index + 1}. ${redirect.url} -> Status: ${redirect.status}${redirect.location ? ` -> Location: ${redirect.location}` : ''}`);
         });
       }
       
@@ -621,7 +623,7 @@ ${commentText}`;
         try {
           await isolatedPage.close();
         } catch (closeError) {
-          console.error(`    Warning: Failed to close isolated page: ${closeError.message}`);
+          console.error(`Warning: Failed to close isolated page: ${closeError.message}`);
         }
       }
     }
