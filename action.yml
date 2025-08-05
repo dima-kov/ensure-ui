@@ -69,14 +69,9 @@ runs:
     - name: Save screenshots to separate branch
       if: always() && hashFiles('screenshots/*.png') != ''
       run: |
-        # Configure git
         git config --local user.email "action@github.com"
         git config --local user.name "EnsureUI Action"
 
-        echo "🔄 Fetching latest refs..."
-        git fetch origin
-
-        # Get current branch name and create screenshot branch name
         CURRENT_BRANCH="${{ github.ref_name }}"
         SCREENSHOT_BRANCH="${CURRENT_BRANCH}-ensureui-${{ github.run_id }}"
         
@@ -85,22 +80,9 @@ runs:
         if [ -d "screenshots" ] && [ "$(ls -A screenshots)" ]; then
           git add screenshots/
           git commit -m "EnsureUI screenshots for run ${{ github.run_id }}"
-          
-          echo "🤖 Generated screenshots from EnsureUI testing"
-
-          echo "Branch: ${{ github.ref_name }}"
-          echo "Run ID: ${{ github.run_id }}"
-          echo "Commit: ${{ github.sha }}"
-
-          # Check if remote branch exists and delete it if so
           git push origin --delete "$SCREENSHOT_BRANCH" || echo "Branch didn't exist or already deleted"
-
-          # Push with explicit upstream setting
-          echo "🚀 Pushing branch..."
           git push -u origin "$SCREENSHOT_BRANCH"
-
           echo "📸 Screenshots saved to branch: $SCREENSHOT_BRANCH"
-          echo "🔗 View at: https://github.com/${{ github.repository }}/tree/$SCREENSHOT_BRANCH"
         else
           echo "No screenshots found to save"
         fi
