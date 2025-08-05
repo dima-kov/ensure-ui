@@ -322,9 +322,9 @@ class EnsureUITester {
 
   // Generate LLM prompt for test generation
   generateLLMPrompt(html, expectation, currentUrl, redirectChain) {
-    const redirectInfo = redirectChain && redirectChain.length > 0 
-      ? `\n- REDIRECT CHAIN AVAILABLE: A 'redirectChain' variable contains all HTTP responses with redirect info\n- redirectChain format: [{url, status, location}, ...] where location is the redirect target\n- Use redirectChain to test redirect status codes and targets`
-      : '';
+    const redirectInfo = redirectChain && redirectChain.length > 0 ?
+        `\n- REDIRECT CHAIN AVAILABLE: A 'redirectChain' variable contains all HTTP responses with redirect info\n- redirectChain format: [{url, status, location}, ...] where location is the redirect target\n- Use redirectChain to test redirect status codes and targets` :
+        '';
 
     return `You are a Playwright testing expert. Generate ONLY the test code to verify the expectation.
 
@@ -427,13 +427,11 @@ ${commentText}`;
     try {
       const generatedCode = await this.llm.generateText(prompt, systemPrompt, 500, 0.1);
 
-      // Clean up the generated code - remove markdown if present
-      const cleanCode = generatedCode
+      return generatedCode
         .replace(/```(?:javascript|js)?\n?/g, '')
         .replace(/```/g, '')
         .trim();
 
-      return cleanCode;
     } catch (error) {
       console.error('LLM API call failed:', error);
       throw error;
@@ -476,6 +474,7 @@ ${commentText}`;
         redirectChain.push({
           url: response.url(),
           status: response.status(),
+          /* jshint -W069 */
           location: response.headers()['location'] || null
         });
       });
@@ -535,17 +534,7 @@ ${commentText}`;
       }
 
       // Take screenshot
-      const screenshotDir = process.env.GITHUB_WORKSPACE ? `${process.env.GITHUB_WORKSPACE}/screenshots` : 'screenshots';
-      const screenshotFilename = `${pageInfo.route.replace(/\//g, '_')}.png`;
-      const screenshotPath = `${screenshotDir}/${screenshotFilename}`;
-      
-      // Ensure directory exists
-      if (!fs.existsSync(screenshotDir)) {
-        fs.mkdirSync(screenshotDir, { recursive: true });
-      }
-      
-      await page.screenshot({ path: screenshotPath, fullPage: true });
-      testResult.screenshot = screenshotPath;
+      testResult.screenshot = await this.takeScreenshot(page, pageInfo.route);
 
       // Overall test result
       testResult.passed = testResult.basicChecks.pageLoaded &&
@@ -559,6 +548,21 @@ ${commentText}`;
     }
 
     return testResult;
+  }
+
+  // Take screenshot utility function
+  async takeScreenshot(page, route) {
+    const screenshotDir = process.env.GITHUB_WORKSPACE ? `${process.env.GITHUB_WORKSPACE}/screenshots` : 'screenshots';
+    const screenshotFilename = `${route.replace(/\//g, '_')}.png`;
+    const screenshotPath = `${screenshotDir}/${screenshotFilename}`;
+    
+    // Ensure directory exists
+    if (!fs.existsSync(screenshotDir)) {
+      fs.mkdirSync(screenshotDir, { recursive: true });
+    }
+    
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+    return screenshotPath;
   }
 
   // Execute the LLM-generated test code safely
