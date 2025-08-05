@@ -74,10 +74,11 @@ runs:
         git config --local user.name "EnsureUI Action"
 
         git remote set-url origin https://x-access-token:${{ inputs.github-token }}@github.com/${{ github.repository }}.git
-        # Verify the remote was set
-        echo "New remote:"
-        git remote -v
-
+        
+        # Fetch latest to ensure we have all refs
+        echo "🔄 Fetching latest refs..."
+        git fetch origin
+        
         # Get current branch name and create screenshot branch name
         CURRENT_BRANCH="${{ github.ref_name }}"
         SCREENSHOT_BRANCH="${CURRENT_BRANCH}-ensureui-${{ github.run_id }}"
@@ -98,8 +99,9 @@ runs:
           
           Screenshots are automatically saved to this temporary branch for review."
           
-          # Push the branch
-          git push origin "$SCREENSHOT_BRANCH"
+          # Push with explicit upstream setting
+          echo "🚀 Pushing branch..."
+          git push -u origin "$SCREENSHOT_BRANCH"
           
           echo "📸 Screenshots saved to branch: $SCREENSHOT_BRANCH"
           echo "🔗 View at: https://github.com/${{ github.repository }}/tree/$SCREENSHOT_BRANCH"
