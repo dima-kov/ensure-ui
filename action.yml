@@ -75,25 +75,25 @@ runs:
 
         CURRENT_BRANCH="${{ github.ref_name }}"
         SCREENSHOT_BRANCH="${CURRENT_BRANCH}-ensureui-${{ github.run_id }}"
-        
+
         git checkout -b "$SCREENSHOT_BRANCH"
-        
+
         if [ -d "screenshots" ] && [ "$(ls -A screenshots)" ]; then
           git add screenshots/
           git commit -m "EnsureUI screenshots for run ${{ github.run_id }}
-          
+
           🤖 Generated screenshots from EnsureUI testing
-          
+
           Branch: ${{ github.ref_name }}
           Run ID: ${{ github.run_id }}
           Commit: ${{ github.sha }}
-          
+
           Screenshots are automatically saved to this temporary branch for review."
-          
+  
           # Push with explicit upstream setting
           echo "🚀 Pushing branch..."
           git push -u origin "$SCREENSHOT_BRANCH"
-          
+
           echo "📸 Screenshots saved to branch: $SCREENSHOT_BRANCH"
           echo "🔗 View at: https://github.com/${{ github.repository }}/tree/$SCREENSHOT_BRANCH"
         else
