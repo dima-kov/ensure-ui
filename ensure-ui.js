@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { chromium } = require('playwright');
 const { expect } = require('@playwright/test');
 
@@ -553,15 +554,25 @@ ${commentText}`;
   // Take screenshot utility function
   async takeScreenshot(page, route) {
     const screenshotDir = process.env.GITHUB_WORKSPACE ? `${process.env.GITHUB_WORKSPACE}/screenshots` : 'screenshots';
-    const screenshotFilename = `${route.replace(/\//g, '_')}.png`;
+    const screenshotFilename = `${route.replace(/\//g, '_')}_${crypto.randomUUID().split('-')[0]}.png`;
     const screenshotPath = `${screenshotDir}/${screenshotFilename}`;
     
     // Ensure directory exists
     if (!fs.existsSync(screenshotDir)) {
       fs.mkdirSync(screenshotDir, { recursive: true });
     }
-    
+
     await page.screenshot({ path: screenshotPath, fullPage: true });
+    
+    // Log GitHub URL for the screenshot
+    if (process.env.GITHUB_REPOSITORY && process.env.GITHUB_RUN_ID) {
+      const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+      const branchName = process.env.GITHUB_REF_NAME || process.env.GITHUB_REF?.replace('refs/heads/', '') || 'main';
+      const screenshotBranch = `${branchName}-ensureui-${process.env.GITHUB_RUN_ID}`;
+      const githubUrl = `https://github.com/${owner}/${repo}/blob/${screenshotBranch}/screenshots/${screenshotFilename}`;
+      console.log(`📸 Screenshot URL: ${githubUrl}`);
+    }
+    
     return screenshotPath;
   }
 
