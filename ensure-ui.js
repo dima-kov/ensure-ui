@@ -532,7 +532,7 @@ ${commentText}`;
             error: error.message
           });
         }
-        break
+        break;
       }
 
       // Take screenshot
