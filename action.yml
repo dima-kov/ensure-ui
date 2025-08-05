@@ -74,7 +74,10 @@ runs:
         git config --local user.name "EnsureUI Action"
 
         git remote set-url origin https://x-access-token:${{ inputs.github-token }}@github.com/${{ github.repository }}.git
-        
+        # Verify the remote was set
+        echo "New remote:"
+        git remote -v
+
         # Get current branch name and create screenshot branch name
         CURRENT_BRANCH="${{ github.ref_name }}"
         SCREENSHOT_BRANCH="${CURRENT_BRANCH}-ensureui-${{ github.run_id }}"
