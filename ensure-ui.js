@@ -662,14 +662,6 @@ ${commentText}`;
       
       const result = await this.runPageTest(page);
       this.results.pages.push(result);
-
-      if (result.passed) {
-        this.results.passedPages++;
-        console.log(`✅ PASSED`);
-      } else {
-        this.results.failedPages++;
-        console.log(`❌ FAILED`);
-      }
     }
 
     console.log(`\n\n${'='.repeat(80)}\n\n`);
