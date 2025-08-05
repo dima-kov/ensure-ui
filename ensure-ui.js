@@ -677,7 +677,6 @@ ${commentText}`;
         this.results.failedPages++;
         console.log(`  💥 OVERALL: ❌ FAILED`);
       }
-      break;
     }
 
     console.log(`\n${'='.repeat(80)}`);
