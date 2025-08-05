@@ -666,12 +666,13 @@ ${commentText}`;
 
     console.log(`\n\n${'='.repeat(80)}\n\n`);
     console.log(`🏁 FINAL RESULTS`);
-    console.log(`Total pages tested: ${pages.length}`);
+    console.log(`Tested: ${pages.length}`);
     console.log(`Passed: ${this.results.passedPages}`);
     console.log(`Failed: ${this.results.failedPages}`);
-    
+    console.log(' ');
+
     if (this.results.failedPages > 0) {
-      console.log(`\n❌ Failed pages:`);
+      console.log(`\n❌ Failed:`);
       const failedPages_list = this.results.pages.filter(p => !p.passed);
       failedPages_list.forEach(page => {
         console.log(`- ${page.route}`);
