@@ -671,6 +671,11 @@ The generated code should be functional and demonstrate the intended behavior wh
       console.log(`Expectations: ${page.expectations.length}`);
       
       const result = await this.runPageTest(page);
+      if (result.passed) {
+        this.results.passedPages++;
+      } else {
+        this.results.failedPages++;
+      }
       this.results.pages.push(result);
     }
 
