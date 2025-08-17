@@ -273,6 +273,7 @@ class EnsureUITester {
     route = route.replace(/\[([^\]]+)\]/g, (match, param) => {
       if (param === 'id') return '1';
       if (param === 'slug') return 'example';
+      if (param === 'subdomain') return 'ai';
       if (param.startsWith('...')) return param.slice(3);
       return param;
     });
