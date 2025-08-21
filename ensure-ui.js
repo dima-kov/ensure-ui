@@ -5,7 +5,7 @@ const { chromium } = require('playwright');
 const { expect } = require('@playwright/test');
 
 async function generateText(apiKey, prompt, systemPrompt, maxTokens = 500, temperature = 0.1) {
-  const response = await fetch('https://ensureui-be-production.up.railway.app/ensureui', {
+  const response = await fetch('https://ensureui-be-production.up.railway.app/ensure', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
