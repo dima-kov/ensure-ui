@@ -7,12 +7,9 @@ inputs:
   github-token:
     description: 'GitHub token for authentication'
     required: true
-  openai-api-key:
-    description: 'OpenAI API key'
-    required: false
-  anthropic-api-key:
-    description: 'Anthropic API key'
-    required: false
+  ensure-api-key:
+    description: 'API key for EnsureUI backend service'
+    required: true
   timeout:
     description: 'Page load timeout in seconds'
     required: false
@@ -56,8 +53,7 @@ runs:
         DEPLOYMENT_URL: ${{ inputs.deployment-url }}
         TIMEOUT: ${{ inputs.timeout }}
         GITHUB_TOKEN: ${{ inputs.github-token }}
-        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
-        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        ENSURE_API_KEY: ${{ inputs.ensure-api-key }}
         GITHUB_REPOSITORY: ${{ github.repository }}
         GITHUB_EVENT_NAME: ${{ github.event_name }}
         GITHUB_REF: ${{ github.ref }}

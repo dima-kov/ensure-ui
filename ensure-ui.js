@@ -4,88 +4,38 @@ const crypto = require('crypto');
 const { chromium } = require('playwright');
 const { expect } = require('@playwright/test');
 
-// LLM Abstraction Layer
-class LLMProvider {
-  async generateText(prompt, systemPrompt, maxTokens = 500, temperature = 0.1) {
-    throw new Error('generateText method must be implemented by subclass');
+async function generateText(apiKey, prompt, systemPrompt, maxTokens = 500, temperature = 0.1) {
+  const response = await fetch('https://ensureui-be-production.up.railway.app/ensureui', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      max_tokens: maxTokens,
+      temperature: temperature
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`EnsureUI API error: ${response.status} ${response.statusText}`);
   }
+
+  const data = await response.json();
+  return data.choices[0].message.content.trim();
 }
 
-class OpenAIProvider extends LLMProvider {
-  constructor(apiKey) {
-    super();
-    this.apiKey = apiKey;
-  }
-
-  async generateText(prompt, systemPrompt, maxTokens = 500, temperature = 0.1) {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_tokens: maxTokens,
-        temperature: temperature
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.choices[0].message.content.trim();
-  }
-}
-
-class AnthropicProvider extends LLMProvider {
-  constructor(apiKey) {
-    super();
-    this.apiKey = apiKey;
-  }
-
-  async generateText(prompt, systemPrompt, maxTokens = 500, temperature = 0.1) {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': `${this.apiKey}`,
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: maxTokens,
-        temperature: temperature,
-        system: systemPrompt,
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Anthropic API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.content[0].text;
-  }
-}
 
 class EnsureUITester {
   constructor() {
@@ -99,22 +49,11 @@ class EnsureUITester {
     this.sha = process.env.GITHUB_SHA;
     this.prNumber = process.env.PR_NUMBER;
     
-    // Initialize LLM provider based on environment variables
-    // const llmProvider = process.env.OPENAI_API_KEY ? 'openai' : 'anthropic';
-    const llmProvider = 'openai';
-    const openaiApiKey = process.env.OPENAI_API_KEY;
-    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+    // Initialize API key
+    this.apiKey = process.env.ENSURE_API_KEY;
     
-    if (llmProvider === 'anthropic') {
-      if (!anthropicApiKey) {
-        throw new Error('ANTHROPIC_API_KEY environment variable is required when using Anthropic provider');
-      }
-      this.llm = new AnthropicProvider(anthropicApiKey);
-    } else {
-      if (!openaiApiKey) {
-        throw new Error('OPENAI_API_KEY environment variable is required when using OpenAI provider');
-      }
-      this.llm = new OpenAIProvider(openaiApiKey);
+    if (!this.apiKey) {
+      throw new Error('ENSURE_API_KEY environment variable is required');
     }
 
     this.results = {
@@ -400,7 +339,7 @@ ${commentText}`;
     const systemPrompt = 'You are a test expectation analyzer. Split UI testing expectations into individual tests. Return only valid JSON array of strings.';
 
     try {
-      const result = await this.llm.generateText(prompt, systemPrompt, 300, 0.1);
+      const result = await generateText(this.apiKey, prompt, systemPrompt, 300, 0.1);
       
       // Clean and parse JSON
       const cleanResult = result.replace(/```json\n?/g, '').replace(/```/g, '').trim();
@@ -437,7 +376,7 @@ When the user includes placeholders in their request, generate appropriate code 
 The generated code should be functional and demonstrate the intended behavior while making the placeholder logic clear and easily modifiable.Use await expect() for assertions.`
 
     try {
-      const generatedCode = await this.llm.generateText(prompt, systemPrompt, 500, 0.1);
+      const generatedCode = await generateText(this.apiKey, prompt, systemPrompt, 500, 0.1);
 
       return generatedCode
         .replace(/```(?:javascript|js)?\n?/g, '')
@@ -640,8 +579,8 @@ The generated code should be functional and demonstrate the intended behavior wh
   async run() {
     console.log('🤖 Starting EnsureUI tests with LLM...');
 
-    if (!this.llm) {
-      console.error('LLM provider not properly initialized');
+    if (!this.apiKey) {
+      console.error('API key not properly initialized');
       process.exit(1);
     }
 
