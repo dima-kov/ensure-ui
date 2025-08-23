@@ -1,0 +1,23 @@
+{
+  "name": "ensureui",
+  "version": "1.0.0",
+  "description": "LLM-powered automated UI testing for Next.js applications",
+  "main": "index.js",
+  "bin": {
+    "ensureui": "./bin/cli.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["ui-testing", "playwright", "nextjs", "llm", "automation"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "playwright": "^1.40.0",
+    "@playwright/test": "^1.40.0",
+    "commander": "^11.1.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
