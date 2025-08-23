@@ -90,16 +90,22 @@ class EnsureUITester {
       if (stat.isDirectory()) {
         await this.scanDirectory(fullPath, pages);
       } else if (this.isPageFile(item)) {
-        const [expectations, rawExpectations] = await this.extractEnsureUIComments(fullPath);
+        const [expectations, rawExpectations, urlParams] = await this.extractEnsureUIComments(fullPath);
         if (expectations.length > 0) {
-          const route = this.getRouteFromPath(fullPath);
-          pages.push({
-            filePath: fullPath,
-            route: route,
-            url: `${this.deploymentUrl}${route}`,
-            rawExpectations: rawExpectations,
-            expectations: expectations
-          });
+          try {
+            const route = this.getRouteFromPath(fullPath, urlParams);
+            pages.push({
+              filePath: fullPath,
+              route: route,
+              url: `${this.deploymentUrl}${route}`,
+              rawExpectations: rawExpectations,
+              expectations: expectations
+            });
+          } catch (error) {
+            console.error(`❌ Parameter Error in ${fullPath}: ${error.message}`);
+            // Skip this page due to missing parameter specification
+            continue;
+          }
         }
       }
     }
@@ -146,14 +152,19 @@ class EnsureUITester {
         }
       }
 
-      // Second pass: Split each raw comment into individual expectations using LLM
+      // Second pass: Split each raw comment into individual expectations using LLM and collect URL params
       const expectations = [];
+      let allUrlParams = {};
+      
       for (const comment of rawComments) {
         try {
-          const splitExpectations = await this.splitExpectations(comment.text);
+          const result = await this.splitExpectations(comment.text);
+          
+          // Merge URL parameters from this comment
+          allUrlParams = { ...allUrlParams, ...result.urlParams };
           
           // Add each split expectation with the same line number
-          for (const expectationText of splitExpectations) {
+          for (const expectationText of result.expectations) {
             expectations.push({
               text: expectationText.trim(),
               lineNumber: comment.lineNumber,
@@ -171,7 +182,7 @@ class EnsureUITester {
         }
       }
 
-      return [expectations, rawComments.map(c => c.text).join('\n')];
+      return [expectations, rawComments.map(c => c.text).join('\n'), allUrlParams];
     } catch (error) {
       console.error(`Error reading file ${filePath}:`, error);
       return [];
@@ -188,7 +199,7 @@ class EnsureUITester {
     return pagePatterns.some(pattern => pattern.test(filename));
   }
 
-  getRouteFromPath(filePath) {
+  getRouteFromPath(filePath, urlParams = {}) {
     let route = filePath;
     route = route.replace(/\\/g, '/');
 
@@ -210,11 +221,16 @@ class EnsureUITester {
     route = route.replace(/^index$/, '');
 
     route = route.replace(/\[([^\]]+)\]/g, (match, param) => {
-      if (param === 'id') return '1';
-      if (param === 'slug') return 'example';
-      if (param === 'subdomain') return 'ai';
-      if (param.startsWith('...')) return param.slice(3);
-      return param;
+      // Remove dots for catch-all params: [...slug] -> slug
+      const cleanParam = param.startsWith('...') ? param.slice(3) : param;
+      
+      if (urlParams[cleanParam] !== undefined) {
+        return urlParams[cleanParam];
+      }
+      
+      // If parameter required but not specified, throw error
+      throw new Error(`Route parameter '[${param}]' required but not specified in test expectations. 
+Example: "// ensureUI: test page with ${cleanParam} 123"`);
     });
 
     if (!route.startsWith('/')) {
@@ -318,43 +334,66 @@ Category: [Determine from keywords above]
 Generate minimal Playwright test code:`;
   }
 
-  // Split a single comment into multiple testable expectations using LLM
+  // Split a single comment into multiple testable expectations using LLM and extract URL parameters
   async splitExpectations(commentText) {
-    const prompt = `You are a Senior QA.
-Your task: convert the user's natural language test expectations into a **pure JSON array of strings**,  
-where each string represents a complete test scenario or independent test expectation.
+    const prompt = `You are a Senior QA analyzing UI test expectations.
 
-Rules:
+Your task: Extract test expectations AND URL parameter specifications from user input.
+
+Return a JSON object with this exact structure:
+{
+  "expectations": ["array of test expectation strings"],
+  "urlParams": {
+    "paramName": "value"
+  }
+}
+
+Rules for expectations:
 1. Split by major test boundaries: explicit test labels (Test1, Test2, etc.), or distinct test scenarios separated by blank lines.
 2. Keep related test steps within the same scenario grouped together as a single item. Group standalone assertions (content checks that don't require user actions) together. For tests requiring user interactions (clicks, navigation, form filling, etc.), preserve the exact order as specified in the original input.
 3. For setup/utility expectations (like "ensureUI", "page loaded", etc.) that aren't part of a specific test, treat as separate items.
-4. Do **not** add any explanations or extra keys; output JSON array only.
-5. Preserve original wording unless a **minimal rewrite** is needed for clarity.
-6. Each item should represent either a complete test flow or an independent verification.
-7. When combining steps within a test, use "then" to connect sequential actions.
+4. Preserve original wording unless a **minimal rewrite** is needed for clarity.
+5. Each item should represent either a complete test flow or an independent verification.
+6. When combining steps within a test, use "then" to connect sequential actions.
+
+Rules for urlParams:
+1. Extract any URL parameter values mentioned in the expectations
+2. Look for patterns like: "with id 413", "user john", "category electronics", "use 'ai' as subdomain", "slug example-post"
+3. Map parameter names to their specified values
+4. If no parameters specified, return empty object: {}
+5. Use parameter names that match Next.js conventions: id, slug, userId, category, subdomain, etc.
+6. For catch-all routes [...slug], use "slug" as the parameter name
 
 User expectations:
 ${commentText}`;
 
-    const systemPrompt = 'You are a test expectation analyzer. Split UI testing expectations into individual tests. Return only valid JSON array of strings.';
+    const systemPrompt = 'You are a test expectation analyzer. Split UI testing expectations into individual tests and extract URL parameters. Return only valid JSON object with expectations array and urlParams object.';
 
     try {
       const result = await generateText(this.apiKey, prompt, systemPrompt, 300, 0.1);
       
       // Clean and parse JSON
       const cleanResult = result.replace(/```json\n?/g, '').replace(/```/g, '').trim();
-      const expectations = JSON.parse(cleanResult);
+      const parsed = JSON.parse(cleanResult);
       
-      // Validate it's an array of strings
-      if (!Array.isArray(expectations) || !expectations.every(exp => typeof exp === 'string')) {
+      // Validate structure
+      if (!parsed.expectations || !Array.isArray(parsed.expectations) || 
+          !parsed.expectations.every(exp => typeof exp === 'string') ||
+          typeof parsed.urlParams !== 'object' || parsed.urlParams === null) {
         throw new Error('Invalid response format from LLM');
       }
       
-      return expectations;
+      return {
+        expectations: parsed.expectations,
+        urlParams: parsed.urlParams || {}
+      };
     } catch (error) {
       console.error('LLM expectation splitting failed:', error);
-      // Fallback: return original comment as single expectation
-      return [commentText];
+      // Fallback: return original comment as single expectation with no URL params
+      return {
+        expectations: [commentText],
+        urlParams: {}
+      };
     }
   }
 
