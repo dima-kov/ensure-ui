@@ -2,6 +2,37 @@
 
 LLM-powered automated UI testing for Next.js applications using natural language expectations. Available as both an npm CLI tool and GitHub Action.
 
+
+
+## Guickstart via GitHub Actions
+
+Create `.github/workflows/ui-tests.yml`:
+
+```yaml
+name: UI Tests
+on: [push, pull_request]
+
+jobs:
+  ui-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run EnsureUI Tests
+        run: node ensure-ui.js
+        env:
+          PROJECT_ROOT: ${{ github.workspace }}
+          DEPLOYMENT_URL: https://your-deployed-app.com
+          ENSURE_API_KEY: ${{ secrets.ENSURE_API_KEY }}
+```
+
+> Email for free trial API key `dima.kovalchuk.v(at)gmail.com`
+
+
+## Real app CI output:
+
+<img width="1946" height="520" alt="image" src="https://github.com/user-attachments/assets/ff495a3c-130c-49f4-94b2-fa0d9dbc9e88" />
+
+
 ## Installation
 
 ### As a CLI Tool
@@ -160,63 +191,6 @@ export ENSURE_API_KEY=your-api-key
 export DEPLOYMENT_URL=https://myapp.vercel.app
 ensureui test
 ```
-
-## GitHub Actions Integration
-
-EnsureUI also works as a GitHub Action. Create `.github/workflows/ui-tests.yml`:
-
-```yaml
-name: UI Tests
-on: [push, pull_request]
-
-jobs:
-  ui-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Run EnsureUI Tests
-        run: node ensure-ui.js
-        env:
-          PROJECT_ROOT: ${{ github.workspace }}
-          DEPLOYMENT_URL: https://your-deployed-app.com
-          ENSURE_API_KEY: ${{ secrets.ENSURE_API_KEY }}
-```
-
-## Programmatic Usage
-
-You can also use EnsureUI in your Node.js code:
-
-```javascript
-const { EnsureUITester } = require('ensureui');
-
-const tester = new EnsureUITester({
-  projectRoot: '/path/to/project',
-  deploymentUrl: 'https://myapp.com',
-  apiKey: 'your-api-key',
-  timeout: 15
-});
-
-// Test all pages
-await tester.runAllTests();
-
-// Test single page
-const page = await tester.findPageByRoute('/about');
-if (page) {
-  const result = await tester.runPageTest(page);
-  console.log(result.passed ? 'Passed' : 'Failed');
-}
-```
-
-## File Structure Support
-
-EnsureUI automatically scans these directories for pages:
-
-- `pages/` (Next.js Pages Router)
-- `app/` (Next.js App Router)
-- `src/pages/` (Pages Router with src)
-- `src/app/` (App Router with src)
-
-Supported file extensions: `.js`, `.jsx`, `.ts`, `.tsx`
 
 ## Output
 
