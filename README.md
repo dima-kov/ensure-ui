@@ -28,6 +28,11 @@ jobs:
 > Email for free trial API key `dima.kovalchuk.v(at)gmail.com`
 
 
+## Real app CI output:
+
+<img width="1946" height="520" alt="image" src="https://github.com/user-attachments/assets/ff495a3c-130c-49f4-94b2-fa0d9dbc9e88" />
+
+
 ## Installation
 
 ### As a CLI Tool
