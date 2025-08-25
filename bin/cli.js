@@ -50,12 +50,14 @@ program
         apiKey: options.apiKey
       });
       
-      const page = await tester.findPageByRoute(route);
+      const pages = await tester.findEnsureUIPages();
+      console.log(pages, 'pages')
+      const page = pages.find(page => page.route === route || page.route === route.replace(/\/$/, ''));
       
       if (!page) {
         console.error(`❌ No page found with ensureUI comments for route: ${route}`);
         console.log('\nAvailable pages with ensureUI comments:');
-        const allPages = await tester.findEnsureUIPages();
+        const allPages = pages;
         if (allPages.length === 0) {
           console.log('  None found');
         } else {
